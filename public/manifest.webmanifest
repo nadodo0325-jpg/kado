@@ -1,0 +1,19 @@
+{
+  "name": "Kado 親師生自律同步平台",
+  "short_name": "Kado",
+  "description": "用顏色、符號、時間差，降低家庭日常溝通摩擦。",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fafaf9",
+  "theme_color": "#09090b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/kado-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

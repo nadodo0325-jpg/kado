@@ -1,0 +1,34 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+
+const allowedInteractions = ["pat", "energy", "ok"] as const;
+
+export async function sendParentInteractionAction(formData: FormData) {
+  const supabase = await createClient();
+
+  const studentId = String(formData.get("studentId") || "");
+  const interactionType = String(formData.get("interactionType") || "");
+  const category = String(formData.get("category") || "todo");
+
+  if (!studentId || !allowedInteractions.includes(interactionType as never)) {
+    redirect(`/parent?category=${category}&interaction=failed`);
+  }
+
+  const { error } = await supabase.rpc("create_parent_interaction", {
+    p_student_id: studentId,
+    p_interaction_type: interactionType,
+  });
+
+  if (error) {
+    console.error("sendParentInteractionAction error:", error);
+    redirect(`/parent?category=${category}&interaction=failed`);
+  }
+
+  revalidatePath("/parent");
+  revalidatePath("/student");
+
+  redirect(`/parent?category=${category}&interaction=sent`);
+}

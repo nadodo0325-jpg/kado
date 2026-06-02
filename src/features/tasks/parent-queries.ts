@@ -1,0 +1,148 @@
+import { requireRole } from "@/features/auth/queries";
+import { TASK_CATEGORIES, type TaskCategory } from "@/lib/constants/categories";
+import type { MoodStatus, StudentStatus, TaskStatus } from "@/lib/constants/status";
+import { createClient } from "@/lib/supabase/server";
+import type { KadoUser } from "@/types/kado";
+import type {
+  CategorySummary,
+  DashboardTaskGroup,
+  DashboardTaskItem,
+} from "./types";
+
+type ParentDashboardData = {
+  profile: KadoUser;
+  childId: string | null;
+  childName: string | null;
+  childStatus: StudentStatus | null;
+  childMood: MoodStatus | null;
+  groups: DashboardTaskGroup[];
+  summaries: CategorySummary[];
+};
+
+type ParentChildProfileRow = {
+  student_id: string;
+  student_name: string;
+  current_status: StudentStatus;
+  aura_color: MoodStatus;
+};
+
+type ParentDashboardRow = {
+  status_id: string;
+  student_id: string;
+  student_name: string;
+  task_item_id: string;
+  status: TaskStatus;
+  updated_at: string;
+  task_id: string;
+  task_title: string;
+  category: TaskCategory;
+  item_title: string;
+  due_at: string | null;
+  item_kind: "normal" | "payment" | "form";
+  item_created_at: string;
+};
+
+function buildEmptySummaries(): CategorySummary[] {
+  return TASK_CATEGORIES.map((category) => ({
+    category: category.key,
+    status: "green",
+    completed: 0,
+    total: 0,
+  }));
+}
+
+function buildSummaries(groups: DashboardTaskGroup[]): CategorySummary[] {
+  return TASK_CATEGORIES.map((category) => {
+    const items = groups
+      .filter((group) => group.category === category.key)
+      .flatMap((group) => group.items);
+
+    const total = items.length;
+    const completed = items.filter((item) => item.status === "green").length;
+
+    return {
+      category: category.key,
+      status: total === 0 || completed === total ? "green" : "red",
+      completed,
+      total,
+    };
+  });
+}
+
+function buildGroups(rows: ParentDashboardRow[]): DashboardTaskGroup[] {
+  const groupMap = new Map<string, DashboardTaskGroup>();
+
+  rows.forEach((row) => {
+    const item: DashboardTaskItem = {
+      id: row.task_item_id,
+      title: row.item_title,
+      status: row.status,
+      dueAt: row.due_at,
+      itemKind: row.item_kind,
+    };
+
+    const existingGroup = groupMap.get(row.task_id);
+
+    if (!existingGroup) {
+      groupMap.set(row.task_id, {
+        taskId: row.task_id,
+        category: row.category,
+        title: row.task_title,
+        status: item.status === "green" ? "green" : "red",
+        items: [item],
+      });
+
+      return;
+    }
+
+    existingGroup.items.push(item);
+    existingGroup.status = existingGroup.items.every(
+      (groupItem) => groupItem.status === "green"
+    )
+      ? "green"
+      : "red";
+  });
+
+  return Array.from(groupMap.values());
+}
+
+export async function getParentDashboardData(): Promise<ParentDashboardData> {
+  const profile = await requireRole("parent");
+  const supabase = await createClient();
+
+  const { data: childData } = await supabase.rpc(
+    "get_my_parent_child_profile"
+  );
+
+  const childProfile =
+    childData && childData.length > 0
+      ? (childData[0] as ParentChildProfileRow)
+      : null;
+
+  const { data, error } = await supabase.rpc("get_my_parent_dashboard_rows");
+
+  if (error || !data || data.length === 0) {
+    return {
+      profile,
+      childId: childProfile?.student_id ?? null,
+      childName: childProfile?.student_name ?? null,
+      childStatus: childProfile?.current_status ?? null,
+      childMood: childProfile?.aura_color ?? null,
+      groups: [],
+      summaries: buildEmptySummaries(),
+    };
+  }
+
+  const rows = data as ParentDashboardRow[];
+  const groups = buildGroups(rows);
+
+  return {
+    profile,
+    childId: childProfile?.student_id ?? rows[0]?.student_id ?? null,
+    childName: childProfile?.student_name ?? rows[0]?.student_name ?? null,
+    childStatus: childProfile?.current_status ?? null,
+    childMood: childProfile?.aura_color ?? null,
+    groups,
+    summaries: buildSummaries(groups),
+  };
+}
