@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { StatusDot } from "@/components/common/status-dot";
 import { completeTaskItemAction } from "@/features/tasks/actions";
 import type {
@@ -44,7 +44,7 @@ function getTaskStatusText(status: TaskStatus) {
 function getCategoryButtonClass(isSelected: boolean) {
   return isSelected
     ? "border-r border-b border-[var(--student-border)] bg-[var(--student-card)] p-4 text-left touch-manipulation"
-    : "border-r border-b border-[var(--student-border)] p-4 text-left touch-manipulation hover:bg-[var(--student-card)]";
+    : "border-r border-b border-[var(--student-border)] p-4 text-left touch-manipulation";
 }
 
 export function StudentCategoryBoard({
@@ -56,55 +56,19 @@ export function StudentCategoryBoard({
   groups: DashboardTaskGroup[];
   summaries: CategorySummary[];
 }) {
-  const activeCategoryRef = useRef<TaskCategory>(initialCategory);
-  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const panelRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [selectedCategory, setSelectedCategory] =
+    useState<TaskCategory>(initialCategory);
 
-  const groupsByCategory = useMemo(() => {
-    return TASK_CATEGORIES.reduce<Record<TaskCategory, DashboardTaskGroup[]>>(
-      (result, category) => {
-        result[category.key] = groups.filter(
-          (group) => group.category === category.key
-        );
+  const selectedGroups = useMemo(() => {
+    return groups.filter((group) => group.category === selectedCategory);
+  }, [groups, selectedCategory]);
 
-        return result;
-      },
-      {
-        homework: [],
-        quiz: [],
-        todo: [],
-        others: [],
-      }
-    );
-  }, [groups]);
-
-  function handleCategoryClick(category: TaskCategory) {
-    if (category === activeCategoryRef.current) {
+  function handleCategoryChange(category: TaskCategory) {
+    if (category === selectedCategory) {
       return;
     }
 
-    activeCategoryRef.current = category;
-
-    TASK_CATEGORIES.forEach((item) => {
-      const button = buttonRefs.current[item.key];
-      const panel = panelRefs.current[item.key];
-      const isSelected = item.key === category;
-
-      if (button) {
-        button.className = getCategoryButtonClass(isSelected);
-        button.setAttribute("aria-pressed", String(isSelected));
-      }
-
-      if (panel) {
-        if (isSelected) {
-          panel.classList.remove("hidden");
-          panel.classList.add("block");
-        } else {
-          panel.classList.remove("block");
-          panel.classList.add("hidden");
-        }
-      }
-    });
+    setSelectedCategory(category);
   }
 
   return (
@@ -118,22 +82,13 @@ export function StudentCategoryBoard({
           const status = summary?.status ?? "green";
           const completed = summary?.completed ?? 0;
           const total = summary?.total ?? 0;
-          const isSelected = initialCategory === category.key;
+          const isSelected = selectedCategory === category.key;
 
           return (
             <button
               key={category.key}
-              ref={(element) => {
-                buttonRefs.current[category.key] = element;
-              }}
               type="button"
-              aria-pressed={isSelected}
-              onPointerDown={() => handleCategoryClick(category.key)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  handleCategoryClick(category.key);
-                }
-              }}
+              onPointerDown={() => handleCategoryChange(category.key)}
               className={getCategoryButtonClass(isSelected)}
             >
               <div className="flex items-center justify-between">
@@ -150,20 +105,7 @@ export function StudentCategoryBoard({
         })}
       </section>
 
-      {TASK_CATEGORIES.map((category) => (
-        <div
-          key={category.key}
-          ref={(element) => {
-            panelRefs.current[category.key] = element;
-          }}
-          className={initialCategory === category.key ? "block" : "hidden"}
-        >
-          <CategoryTaskPanel
-            category={category.key}
-            groups={groupsByCategory[category.key]}
-          />
-        </div>
-      ))}
+      <CategoryTaskPanel category={selectedCategory} groups={selectedGroups} />
     </>
   );
 }
@@ -208,12 +150,12 @@ function CategoryTaskPanel({
             </h2>
 
             <p className="kado-mono text-xs text-[var(--student-muted)]">
-              TAP TO COMPLETE
+              TODAY
             </p>
           </div>
 
           {group.items.map((item) => (
-            <LightweightTaskItem
+            <LightTaskRow
               key={item.id}
               taskItemId={item.id}
               title={item.title}
@@ -226,7 +168,7 @@ function CategoryTaskPanel({
   );
 }
 
-function LightweightTaskItem({
+function LightTaskRow({
   taskItemId,
   title,
   status,
@@ -235,24 +177,23 @@ function LightweightTaskItem({
   title: string;
   status: TaskStatus;
 }) {
-  const [optimisticStatus, setOptimisticStatus] = useState<TaskStatus>(status);
+  const [localStatus, setLocalStatus] = useState<TaskStatus>(status);
   const [isPending, startTransition] = useTransition();
 
-  const isDone = optimisticStatus === "green";
-  const canComplete = optimisticStatus === "red";
+  const canComplete = localStatus === "red";
 
   function handleComplete() {
     if (!canComplete || isPending) {
       return;
     }
 
-    setOptimisticStatus("green");
+    setLocalStatus("green");
 
     startTransition(async () => {
       const result = await completeTaskItemAction(taskItemId);
 
       if (!result.ok) {
-        setOptimisticStatus(status);
+        setLocalStatus(status);
       }
     });
   }
@@ -260,7 +201,7 @@ function LightweightTaskItem({
   return (
     <div className="flex items-center justify-between gap-3 border-b border-[var(--student-border)] px-3 py-3 last:border-b-0">
       <div className="flex min-w-0 items-center gap-3">
-        <StatusDot status={toDotStatus(optimisticStatus)} />
+        <StatusDot status={toDotStatus(localStatus)} />
         <p className="truncate text-sm">{title}</p>
       </div>
 
@@ -275,7 +216,7 @@ function LightweightTaskItem({
         </button>
       ) : (
         <span className="kado-mono shrink-0 text-xs text-[var(--student-muted)]">
-          {getTaskStatusText(optimisticStatus)}
+          {getTaskStatusText(localStatus)}
         </span>
       )}
     </div>
