@@ -1,6 +1,10 @@
 import { requireRole } from "@/features/auth/queries";
 import { TASK_CATEGORIES, type TaskCategory } from "@/lib/constants/categories";
-import type { MoodStatus, StudentStatus, TaskStatus } from "@/lib/constants/status";
+import type {
+  MoodStatus,
+  StudentStatus,
+  TaskStatus,
+} from "@/lib/constants/status";
 import { createClient } from "@/lib/supabase/server";
 import type { KadoUser } from "@/types/kado";
 import type {
@@ -42,6 +46,33 @@ type ParentDashboardRow = {
   item_created_at: string;
 };
 
+function getTaipeiDateKey(dateString: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(dateString));
+
+  const year = parts.find((part) => part.type === "year")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayTaipeiDateKey() {
+  return getTaipeiDateKey(new Date().toISOString());
+}
+
+function filterTodayRows(rows: ParentDashboardRow[]) {
+  const todayKey = getTodayTaipeiDateKey();
+
+  return rows.filter(
+    (row) => getTaipeiDateKey(row.item_created_at) === todayKey
+  );
+}
+
 function buildEmptySummaries(): CategorySummary[] {
   return TASK_CATEGORIES.map((category) => ({
     category: category.key,
@@ -59,10 +90,12 @@ function buildSummaries(groups: DashboardTaskGroup[]): CategorySummary[] {
 
     const total = items.length;
     const completed = items.filter((item) => item.status === "green").length;
+    const hasRed = items.some((item) => item.status === "red");
+    const hasProcessing = items.some((item) => item.status === "processing");
 
     return {
       category: category.key,
-      status: total === 0 || completed === total ? "green" : "red",
+      status: hasRed ? "red" : hasProcessing ? "processing" : "green",
       completed,
       total,
     };
@@ -133,7 +166,7 @@ export async function getParentDashboardData(): Promise<ParentDashboardData> {
     };
   }
 
-  const rows = data as ParentDashboardRow[];
+  const rows = filterTodayRows(data as ParentDashboardRow[]);
   const groups = buildGroups(rows);
 
   return {

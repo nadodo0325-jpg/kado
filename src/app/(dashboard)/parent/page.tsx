@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { SectionCard } from "@/components/common/section-card";
 import { StatusDot } from "@/components/common/status-dot";
+import { TaipeiClock } from "@/components/common/taipei-clock";
 import { PageHeader } from "@/components/layout/page-header";
 import { getParentDashboardData } from "@/features/tasks/parent-queries";
 import type { DashboardTaskGroup } from "@/features/tasks/types";
@@ -74,6 +75,8 @@ const interactionFailed = params?.interaction === "failed";
           mutedColor="var(--parent-muted)"
           right={
             <div className="flex items-center gap-2">
+              <TaipeiClock />
+              
               <div className="border border-[var(--parent-border)] bg-white px-3 py-2 text-right">
                 <p className="kado-mono text-xs text-[var(--parent-muted)]">
                   CHILD

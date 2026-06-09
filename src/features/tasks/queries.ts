@@ -30,6 +30,33 @@ type StudentDashboardRow = {
   item_created_at: string;
 };
 
+function getTaipeiDateKey(dateString: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(dateString));
+
+  const year = parts.find((part) => part.type === "year")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayTaipeiDateKey() {
+  return getTaipeiDateKey(new Date().toISOString());
+}
+
+function filterTodayRows(rows: StudentDashboardRow[]) {
+  const todayKey = getTodayTaipeiDateKey();
+
+  return rows.filter(
+    (row) => getTaipeiDateKey(row.item_created_at) === todayKey
+  );
+}
+
 function buildEmptySummaries(): CategorySummary[] {
   return TASK_CATEGORIES.map((category) => ({
     category: category.key,
@@ -110,7 +137,8 @@ export async function getStudentDashboardData(): Promise<StudentDashboardData> {
     };
   }
 
-  const groups = buildGroups(data as StudentDashboardRow[]);
+  const rows = filterTodayRows(data as StudentDashboardRow[]);
+  const groups = buildGroups(rows);
 
   return {
     profile,

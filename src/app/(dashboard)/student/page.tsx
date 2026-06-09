@@ -43,7 +43,27 @@ function isTaskCategory(value: string | undefined): value is TaskCategory {
 function getCategoryLabel(categoryKey: TaskCategory) {
   return TASK_CATEGORIES.find((category) => category.key === categoryKey);
 }
+function formatStudentSystemTime() {
+  const parts = new Intl.DateTimeFormat("zh-TW", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
 
+  const year = parts.find((part) => part.type === "year")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+  const weekday = parts.find((part) => part.type === "weekday")?.value ?? "";
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "";
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "";
+
+  return `${year} 年 ${month} 月 ${day} 日 ${weekday} ${hour}:${minute}`;
+}
 export default async function StudentPage({ searchParams }: StudentPageProps) {
   const params = await searchParams;
   const selectedCategory = isTaskCategory(params?.category)
@@ -51,9 +71,10 @@ export default async function StudentPage({ searchParams }: StudentPageProps) {
     : "todo";
 
   const { profile, groups, summaries } = await getStudentDashboardData();
-  const interactions = await getStudentRecentInteractions();
-  const todayMood = await getTodayMoodCheckin();
-  const mood = MOOD_STATUS[profile.aura_color];
+const interactions = await getStudentRecentInteractions();
+const todayMood = await getTodayMoodCheckin();
+const mood = MOOD_STATUS[profile.aura_color];
+const systemTime = formatStudentSystemTime();
 
   const selectedGroups = groups.filter(
     (group) => group.category === selectedCategory
@@ -67,21 +88,32 @@ export default async function StudentPage({ searchParams }: StudentPageProps) {
           title={`${profile.display_name} 的今日自律看板`}
           borderColor="var(--student-border)"
           mutedColor="var(--student-muted)"
-          right={
-            <div className="flex items-center gap-2">
-              <div className="border border-[var(--student-border)] px-3 py-2 text-right">
-                <p className="kado-mono text-xs text-[var(--student-muted)]">
-                  AURA
-                </p>
-                <p className="text-sm">
-                  {mood.icon} {mood.label}
-                </p>
-              </div>
+         right={
+  <div className="flex items-center gap-2">
+    <div className="border border-[var(--student-border)] px-3 py-2 text-right">
+      <p className="kado-mono text-xs text-[var(--student-muted)]">
+        AURA
+      </p>
+      <p className="text-sm">
+        {mood.icon} {mood.label}
+      </p>
+    </div>
 
-              <LogoutButton tone="dark" />
-            </div>
-          }
-        />
+    <LogoutButton tone="dark" />
+  </div>
+}
+
+                />
+
+        <section className="mt-3 border border-[var(--student-border)] bg-[var(--student-card)] px-3 py-3">
+          <p className="kado-mono text-xs text-[var(--student-muted)]">
+            SYSTEM TIME
+          </p>
+          <p className="mt-1 text-sm font-semibold text-white">
+            {systemTime}
+          </p>
+        </section>
+
         <MoodCheckinPanel
            currentMood={todayMood}
            selectedCategory={selectedCategory}

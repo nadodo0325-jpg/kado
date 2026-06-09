@@ -2,12 +2,14 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { SectionCard } from "@/components/common/section-card";
 import { StatusDot } from "@/components/common/status-dot";
 import { PageHeader } from "@/components/layout/page-header";
+import { TaipeiClock } from "@/components/common/taipei-clock";
 import {
   confirmStudentTaskStatusAction,
   publishTeacherTaskAction,
 } from "@/features/tasks/teacher-actions";
 import {
   getTeacherDashboardData,
+  type PublishedTaskSummary,
   type TeacherDashboardRow,
   type TeacherStudentSummary,
 } from "@/features/tasks/teacher-queries";
@@ -30,6 +32,7 @@ type TeacherPageProps = {
     confirmed?: string;
     error?: string;
     filter?: string;
+    taskRange?: string;
   }>;
 };
 
@@ -44,6 +47,83 @@ function toDotStatus(status: TaskStatus): "red" | "green" | "yellow" {
 
   return "red";
 }
+function getCategoryMeta(categoryKey: string) {
+  return TASK_CATEGORIES.find((category) => category.key === categoryKey);
+}
+
+function getItemKindLabel(itemKind: PublishedTaskSummary["itemKind"]) {
+  if (itemKind === "payment") {
+    return "費用";
+  }
+
+  if (itemKind === "form") {
+    return "回條";
+  }
+
+  return "一般";
+}
+
+function getTaipeiDateKey(dateString: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(dateString));
+
+  const year = parts.find((part) => part.type === "year")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayTaipeiDateKey() {
+  return getTaipeiDateKey(new Date().toISOString());
+}
+
+function getTaipeiDateLabel(dateKey: string) {
+  const [year, month, day] = dateKey.split("-");
+
+  return `${year}/${month}/${day}`;
+}
+
+function getVisiblePublishedTasks(
+  tasks: PublishedTaskSummary[],
+  taskRange: "today" | "month"
+) {
+  if (taskRange === "month") {
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+    return tasks.filter(
+      (task) => new Date(task.createdAt).getTime() >= thirtyDaysAgo
+    );
+  }
+
+  const todayKey = getTodayTaipeiDateKey();
+
+  return tasks.filter((task) => getTaipeiDateKey(task.createdAt) === todayKey);
+}
+
+function groupPublishedTasksByDate(tasks: PublishedTaskSummary[]) {
+  const dateMap = new Map<string, PublishedTaskSummary[]>();
+
+  tasks.forEach((task) => {
+    const dateKey = getTaipeiDateKey(task.createdAt);
+    const existing = dateMap.get(dateKey) ?? [];
+
+    existing.push(task);
+    dateMap.set(dateKey, existing);
+  });
+
+  return Array.from(dateMap.entries())
+    .map(([dateKey, dateTasks]) => ({
+      dateKey,
+      dateLabel: getTaipeiDateLabel(dateKey),
+      tasks: dateTasks,
+    }))
+    .sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+}
 
 export default async function TeacherPage({ searchParams }: TeacherPageProps) {
   const params = await searchParams;
@@ -51,10 +131,18 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
   const confirmed = params?.confirmed === "1";
   const error = params?.error ? errorMessages[params.error] : null;
   const showIncomplete = params?.filter === "incomplete";
+  const taskRange = params?.taskRange === "month" ? "month" : "today";
 
-  const { profile, className, students, rows } = await getTeacherDashboardData();
+  const { profile, className, students, publishedTasks, rows } =
+  await getTeacherDashboardData();
 
   const incompleteRows = rows.filter((row) => row.status !== "green");
+  const visiblePublishedTasks = getVisiblePublishedTasks(
+  publishedTasks,
+  taskRange
+);
+
+const publishedTaskDateGroups = groupPublishedTasksByDate(visiblePublishedTasks);
 
   return (
     <main className="teacher-shell">
@@ -64,6 +152,8 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
           title={`${profile.display_name} 的教師發布中心`}
           right={
             <div className="flex items-center gap-2">
+              <TaipeiClock />
+              
               <a
                href="/teacher/ai-settings"
                className="kado-transition border border-[var(--kado-border)] px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
@@ -229,12 +319,149 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
             </div>
           </SectionCard>
         </section>
+        <PublishedTaskList 
+          dateGroups={publishedTaskDateGroups}
+          taskRange={taskRange}
+        />
 
         {showIncomplete ? (
           <IncompleteList rows={incompleteRows} />
         ) : null}
       </section>
     </main>
+  );
+}
+function PublishedTaskList({
+  dateGroups,
+  taskRange,
+}: {
+  dateGroups: {
+    dateKey: string;
+    dateLabel: string;
+    tasks: PublishedTaskSummary[];
+  }[];
+  taskRange: "today" | "month";
+}) {
+  const totalCount = dateGroups.reduce(
+    (count, group) => count + group.tasks.length,
+    0
+  );
+
+  return (
+    <section className="mt-5 border border-[var(--kado-border)] bg-white">
+      <div className="flex flex-col gap-3 border-b border-[var(--kado-border)] px-4 py-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-sm font-semibold">已發布任務</p>
+          <p className="mt-1 text-xs text-[var(--kado-muted)]">
+            預設只顯示今日任務，歷史紀錄保留近 30 天方便月考前回看。
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <a
+            href="/teacher"
+            className={
+              taskRange === "today"
+                ? "kado-transition border border-zinc-950 bg-zinc-950 px-3 py-2 text-xs font-semibold text-white"
+                : "kado-transition border border-[var(--kado-border)] px-3 py-2 text-xs font-semibold hover:bg-zinc-50"
+            }
+          >
+            今日
+          </a>
+
+          <a
+            href="/teacher?taskRange=month"
+            className={
+              taskRange === "month"
+                ? "kado-transition border border-zinc-950 bg-zinc-950 px-3 py-2 text-xs font-semibold text-white"
+                : "kado-transition border border-[var(--kado-border)] px-3 py-2 text-xs font-semibold hover:bg-zinc-50"
+            }
+          >
+            近 30 天
+          </a>
+
+          <p className="kado-mono text-xs text-[var(--kado-muted)]">
+            COUNT {totalCount}
+          </p>
+        </div>
+      </div>
+
+      {dateGroups.length > 0 ? (
+        <div className="divide-y divide-[var(--kado-border)]">
+          {dateGroups.map((group) => (
+            <div key={group.dateKey}>
+              <div className="border-b border-[var(--kado-border)] bg-zinc-50 px-4 py-2">
+                <p className="kado-mono text-xs font-semibold text-[var(--kado-muted)]">
+                  {group.dateLabel}
+                </p>
+              </div>
+
+              <div className="divide-y divide-[var(--kado-border)]">
+                {group.tasks.map((task) => {
+                  const categoryMeta = getCategoryMeta(task.category);
+
+                  return (
+                    <div
+                      key={task.taskId}
+                      className="grid gap-3 px-4 py-3 lg:grid-cols-[1.2fr_0.8fr_auto]"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{task.taskTitle}</p>
+                        <p className="kado-mono mt-1 text-xs text-[var(--kado-muted)]">
+                          {new Date(task.createdAt).toLocaleTimeString("zh-TW", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            timeZone: "Asia/Taipei",
+                          })}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="border border-[var(--kado-border)] px-2 py-1 text-xs">
+                          {categoryMeta?.icon}{" "}
+                          {categoryMeta?.label ?? task.category}
+                        </span>
+
+                        <span className="border border-[var(--kado-border)] px-2 py-1 text-xs">
+                          {getItemKindLabel(task.itemKind)}
+                        </span>
+
+                        <span className="kado-mono border border-[var(--kado-border)] px-2 py-1 text-xs text-[var(--kado-muted)]">
+                          ITEMS {task.itemCount}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-2 text-right">
+                        <p className="kado-mono text-xs text-red-500">
+                          RED {task.red}
+                        </p>
+                        <p className="kado-mono text-xs text-yellow-600">
+                          PENDING {task.processing}
+                        </p>
+                        <p className="kado-mono text-xs text-green-600">
+                          GREEN {task.green}
+                        </p>
+                        <p className="kado-mono text-xs text-[var(--kado-muted)]">
+                          TOTAL {task.total}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="px-4 py-8">
+          <p className="text-sm text-[var(--kado-muted)]">
+            {taskRange === "today"
+              ? "今日尚未發布任務。若要查看之前的任務，請切換到近 30 天。"
+              : "近 30 天內沒有發布任務紀錄。"}
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 
