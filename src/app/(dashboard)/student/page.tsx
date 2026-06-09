@@ -245,6 +245,11 @@ function StudentInteractionPanel({
       title: "收到了解",
       message: "家長已經收到這件事了。",
     },
+    praise: {
+    icon: "👍",
+    title: "表現很好",
+     message: "家長看見你的努力，送來一個肯定。",
+    },
   };
 
   return (
@@ -259,7 +264,12 @@ function StudentInteractionPanel({
       {interactions.length > 0 ? (
         <div className="divide-y divide-[var(--student-border)]">
           {interactions.map((interaction) => {
-            const item = labels[interaction.interaction_type];
+           const item =
+             labels[interaction.interaction_type as keyof typeof labels] ?? {
+               icon: "•",
+               title: "新的無聲關懷",
+               message: "家長送來了一則新的互動。",
+            };
 
             return (
               <div key={interaction.id} className="px-3 py-3">

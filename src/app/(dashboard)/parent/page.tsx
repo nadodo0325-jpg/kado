@@ -5,14 +5,17 @@ import { StatusDot } from "@/components/common/status-dot";
 import { PageHeader } from "@/components/layout/page-header";
 import { getParentDashboardData } from "@/features/tasks/parent-queries";
 import type { DashboardTaskGroup } from "@/features/tasks/types";
-import { sendParentInteractionAction } from "@/features/interactions/actions";
+import {
+  acknowledgeParentTaskItemAction,
+  sendParentInteractionAction,
+} from "@/features/interactions/actions";
 import { TASK_CATEGORIES, type TaskCategory } from "@/lib/constants/categories";
 import { MOOD_STATUS, STUDENT_STATUS, type TaskStatus } from "@/lib/constants/status";
 
 const parentActions = [
   { id: "pat", icon: "🤝", label: "拍拍肩膀" },
   { id: "energy", icon: "🍵", label: "補充能量" },
-  { id: "ok", icon: "👌", label: "收到了解" },
+  { id: "praise", icon: "👍", label: "表現很好" },
 ];
 
 type ParentPageProps = {
@@ -146,6 +149,7 @@ const interactionFailed = params?.interaction === "failed";
         <ParentCategoryTaskPanel
           category={selectedCategory}
           groups={selectedGroups}
+          childId={childId}
         />
 
         <section className="mt-5 grid grid-cols-3 gap-2">
@@ -171,12 +175,32 @@ const interactionFailed = params?.interaction === "failed";
   );
 }
 
+function getTaskItemKind(item: DashboardTaskGroup["items"][number]) {
+  const maybeItem = item as DashboardTaskGroup["items"][number] & {
+    itemKind?: string | null;
+    item_kind?: string | null;
+  };
+
+  return maybeItem.itemKind ?? maybeItem.item_kind ?? null;
+}
+
+function canShowParentOkButton(item: DashboardTaskGroup["items"][number]) {
+  const itemKind = getTaskItemKind(item);
+
+  return (
+    (itemKind === "payment" || itemKind === "form") &&
+    item.status !== "green"
+  );
+}
+
 function ParentCategoryTaskPanel({
   category,
   groups,
+  childId,
 }: {
   category: TaskCategory;
   groups: DashboardTaskGroup[];
+  childId: string | null;
 }) {
   const categoryMeta = getCategoryLabel(category);
 
@@ -215,20 +239,41 @@ function ParentCategoryTaskPanel({
           </div>
 
           {group.items.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center justify-between border-b border-[var(--parent-border)] px-3 py-3 last:border-b-0"
-            >
-              <div className="flex items-center gap-3">
-                <StatusDot status={toDotStatus(item.status)} />
-                <p className="text-sm">{item.title}</p>
-              </div>
+  <div
+    key={item.id}
+    className="flex items-center justify-between gap-3 border-b border-[var(--parent-border)] px-3 py-3 last:border-b-0"
+  >
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-3">
+        <StatusDot status={toDotStatus(item.status)} />
+        <p className="truncate text-sm">{item.title}</p>
+      </div>
 
-              <span className="kado-mono text-xs text-[var(--parent-muted)]">
-                {item.status.toUpperCase()}
-              </span>
-            </div>
-          ))}
+      <p className="kado-mono mt-1 pl-6 text-xs text-[var(--parent-muted)]">
+        {item.status.toUpperCase()}
+      </p>
+    </div>
+
+    {canShowParentOkButton(item) ? (
+      <form action={acknowledgeParentTaskItemAction} className="shrink-0">
+        <input type="hidden" name="studentId" value={childId ?? ""} />
+        <input type="hidden" name="taskItemId" value={item.id} />
+        <input type="hidden" name="category" value={category} />
+        <button
+          type="submit"
+          disabled={!childId}
+          className="kado-transition border border-[var(--parent-border)] bg-white px-3 py-2 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          收到了解
+        </button>
+      </form>
+    ) : (
+      <span className="kado-mono shrink-0 text-xs text-[var(--parent-muted)]">
+        READ
+      </span>
+    )}
+  </div>
+))}
         </section>
       ))}
     </section>
