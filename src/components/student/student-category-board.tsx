@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { StatusDot } from "@/components/common/status-dot";
 import { SwipeTaskItem } from "@/components/student/swipe-task-item";
 import type {
@@ -47,7 +48,13 @@ export function StudentCategoryBoard({
   );
 
   function handleCategoryClick(category: TaskCategory) {
-    setSelectedCategory(category);
+    if (category === selectedCategory) {
+      return;
+    }
+
+    flushSync(() => {
+      setSelectedCategory(category);
+    });
   }
 
   return (
@@ -67,7 +74,12 @@ export function StudentCategoryBoard({
             <button
               key={category.key}
               type="button"
-              onClick={() => handleCategoryClick(category.key)}
+              onPointerDown={() => handleCategoryClick(category.key)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  handleCategoryClick(category.key);
+                }
+              }}
               className={
                 isSelected
                   ? "border-r border-b border-[var(--student-border)] bg-[var(--student-card)] p-4 text-left touch-manipulation"
