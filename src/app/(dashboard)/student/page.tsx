@@ -2,15 +2,15 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { PageHeader } from "@/components/layout/page-header";
 import { StudentCategoryBoard } from "@/components/student/student-category-board";
 import { MoodCheckinPanel } from "@/components/student/mood-checkin-panel";
+import { StudentStatusPanel } from "@/components/student/student-status-panel";
 import { getStudentDashboardData } from "@/features/tasks/queries";
 import {
   getStudentRecentInteractions,
   type StudentInteraction,
 } from "@/features/interactions/student-queries";
 import { getTodayMoodCheckin } from "@/features/status/queries";
-import { setStudentStatusAction } from "@/features/status/actions";
 import { TASK_CATEGORIES, type TaskCategory } from "@/lib/constants/categories";
-import { MOOD_STATUS, STUDENT_STATUS } from "@/lib/constants/status";
+import { MOOD_STATUS } from "@/lib/constants/status";
 
 type StudentPageProps = {
   searchParams?: Promise<{
@@ -97,44 +97,11 @@ export default async function StudentPage({ searchParams }: StudentPageProps) {
           result={params?.mood}
         />
 
-        <section className="mt-5 grid grid-cols-3 gap-2">
-          {Object.entries(STUDENT_STATUS).map(([key, item]) => {
-            const isSelected = profile.current_status === key;
-
-            return (
-              <form key={key} action={setStudentStatusAction}>
-                <input type="hidden" name="studentStatus" value={key} />
-                <input type="hidden" name="category" value={selectedCategory} />
-
-                <button
-                  type="submit"
-                  className={
-                    isSelected
-                      ? "kado-transition w-full border border-green-500 bg-[var(--green-soft)] px-3 py-3 text-left"
-                      : "kado-transition w-full border border-[var(--student-border)] px-3 py-3 text-left hover:bg-[var(--student-card)]"
-                  }
-                >
-                  <span className="block text-lg">{item.icon}</span>
-                  <span className="mt-2 block text-xs text-[var(--student-muted)]">
-                    {item.label}
-                  </span>
-                </button>
-              </form>
-            );
-          })}
-        </section>
-
-        {params?.student_status === "updated" ? (
-          <div className="mt-3 border border-green-500/40 bg-[var(--green-soft)] px-3 py-2 text-xs text-green-400">
-            目前狀態已更新。
-          </div>
-        ) : null}
-
-        {params?.student_status === "failed" ? (
-          <div className="mt-3 border border-red-500/40 bg-[var(--red-soft)] px-3 py-2 text-xs text-red-400">
-            狀態更新失敗，請稍後再試。
-          </div>
-        ) : null}
+        <StudentStatusPanel
+          currentStatus={profile.current_status}
+          selectedCategory={selectedCategory}
+          result={params?.student_status}
+        />
 
         <StudentCategoryBoard
           initialCategory={selectedCategory}

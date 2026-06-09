@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { setStudentStatusSilentAction } from "@/features/status/actions";
 import type { TaskCategory } from "@/lib/constants/categories";
 import { STUDENT_STATUS, type StudentStatus } from "@/lib/constants/status";
@@ -13,91 +14,76 @@ type StudentStatusPanelProps = {
   result?: string;
 };
 
+function getValidStatus(
+  value: StudentStatus | string | null | undefined
+): StudentStatus | null {
+  return statusKeys.includes(value as StudentStatus)
+    ? (value as StudentStatus)
+    : null;
+}
+
+function getStatusButtonClass(isSelected: boolean) {
+  return isSelected
+    ? "w-full border border-green-500 bg-[var(--green-soft)] px-3 py-3 text-left touch-manipulation"
+    : "w-full border border-[var(--student-border)] px-3 py-3 text-left touch-manipulation";
+}
+
 export function StudentStatusPanel({
   currentStatus,
   selectedCategory,
   result,
 }: StudentStatusPanelProps) {
-  const initialStatus = statusKeys.includes(currentStatus as StudentStatus)
-    ? (currentStatus as StudentStatus)
-    : null;
+  const initialStatus = getValidStatus(currentStatus);
 
-  const activeStatusRef = useRef<StudentStatus | null>(initialStatus);
+  const [localStatus, setLocalStatus] = useState<StudentStatus | null>(
+    initialStatus
+  );
+
   const requestIdRef = useRef(0);
   const helperRef = useRef<HTMLParagraphElement | null>(null);
-  const inputRefs = useRef<
-    Partial<Record<StudentStatus, HTMLInputElement | null>>
-  >({});
 
-  function setHelperText(type: "idle" | "saving" | "updated" | "failed") {
+  function setHelperText(type: "idle" | "updated" | "failed") {
     const helper = helperRef.current;
 
     if (!helper) {
       return;
     }
 
-    if (type === "saving") {
-      helper.textContent = "正在背景更新狀態，不影響你繼續操作。";
-      helper.className = "mt-2 text-xs text-[var(--student-muted)]";
-      return;
-    }
-
     if (type === "updated") {
       helper.textContent = "目前狀態已更新。";
-      helper.className = "mt-2 text-xs text-green-400";
+      helper.className = "mt-2 min-h-4 text-xs text-green-400";
       return;
     }
 
     if (type === "failed") {
       helper.textContent = "狀態更新失敗，已還原上一個狀態。";
-      helper.className = "mt-2 text-xs text-red-400";
+      helper.className = "mt-2 min-h-4 text-xs text-red-400";
       return;
     }
 
     helper.textContent = "選擇你現在的學習狀態。";
-    helper.className = "mt-2 text-xs text-[var(--student-muted)]";
-  }
-
-  function rollbackStatus(previousStatus: StudentStatus | null) {
-    activeStatusRef.current = previousStatus;
-
-    statusKeys.forEach((key) => {
-      const input = inputRefs.current[key];
-
-      if (input) {
-        input.checked = key === previousStatus;
-      }
-    });
-  }
-
-  function paintStatus(statusKey: StudentStatus) {
-    statusKeys.forEach((key) => {
-      const input = inputRefs.current[key];
-
-      if (input) {
-        input.checked = key === statusKey;
-      }
-    });
-
-    activeStatusRef.current = statusKey;
+    helper.className = "mt-2 min-h-4 text-xs text-[var(--student-muted)]";
   }
 
   function handleStatusSelect(statusKey: StudentStatus) {
-    if (activeStatusRef.current === statusKey) {
+    if (localStatus === statusKey) {
       return;
     }
 
-    const previousStatus = activeStatusRef.current;
+    const previousStatus = localStatus;
     const requestId = requestIdRef.current + 1;
 
     requestIdRef.current = requestId;
 
-    paintStatus(statusKey);
-    setHelperText("saving");
+    flushSync(() => {
+      setLocalStatus(statusKey);
+    });
 
-    window.setTimeout(() => {
-      void saveStatus(statusKey, previousStatus, requestId);
-    }, 0);
+    window.requestAnimationFrame(() => {
+      window.setTimeout(() => {
+        void saveStatus(statusKey, previousStatus, requestId);
+      }, 350);
+    });
   }
 
   async function saveStatus(
@@ -126,7 +112,10 @@ export function StudentStatusPanel({
         return;
       }
 
-      rollbackStatus(previousStatus);
+      flushSync(() => {
+        setLocalStatus(previousStatus);
+      });
+
       setHelperText("failed");
     }
   }
@@ -140,43 +129,30 @@ export function StudentStatusPanel({
 
   const initialHelperClass =
     result === "updated"
-      ? "mt-2 text-xs text-green-400"
+      ? "mt-2 min-h-4 text-xs text-green-400"
       : result === "failed"
-        ? "mt-2 text-xs text-red-400"
-        : "mt-2 text-xs text-[var(--student-muted)]";
+        ? "mt-2 min-h-4 text-xs text-red-400"
+        : "mt-2 min-h-4 text-xs text-[var(--student-muted)]";
 
   return (
     <section className="mt-5">
       <div className="grid grid-cols-3 gap-2">
         {statusKeys.map((statusKey) => {
           const item = STUDENT_STATUS[statusKey];
-          const isSelected = initialStatus === statusKey;
+          const isSelected = localStatus === statusKey;
 
           return (
-            <label
+            <button
               key={statusKey}
-              className="block touch-manipulation"
+              type="button"
               onPointerDown={() => handleStatusSelect(statusKey)}
+              className={getStatusButtonClass(isSelected)}
             >
-              <input
-                ref={(element) => {
-                  inputRefs.current[statusKey] = element;
-                }}
-                type="radio"
-                name="student-current-status"
-                value={statusKey}
-                defaultChecked={isSelected}
-                onChange={() => handleStatusSelect(statusKey)}
-                className="peer sr-only"
-              />
-
-              <span className="block w-full border border-[var(--student-border)] px-3 py-3 text-left peer-checked:border-green-500 peer-checked:bg-[var(--green-soft)]">
-                <span className="block text-lg">{item.icon}</span>
-                <span className="mt-2 block text-xs text-[var(--student-muted)]">
-                  {item.label}
-                </span>
+              <span className="block text-lg">{item.icon}</span>
+              <span className="mt-2 block text-xs text-[var(--student-muted)]">
+                {item.label}
               </span>
-            </label>
+            </button>
           );
         })}
       </div>
