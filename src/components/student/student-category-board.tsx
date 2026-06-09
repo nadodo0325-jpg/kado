@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef } from "react";
 import { StatusDot } from "@/components/common/status-dot";
 import { SwipeTaskItem } from "@/components/student/swipe-task-item";
 import type {
@@ -41,6 +41,12 @@ function getTaskStatusText(status: TaskStatus) {
   return "TODO";
 }
 
+function getCategoryButtonClass(isSelected: boolean) {
+  return isSelected
+    ? "border-r border-b border-[var(--student-border)] bg-[var(--student-card)] p-4 text-left touch-manipulation"
+    : "border-r border-b border-[var(--student-border)] p-4 text-left touch-manipulation hover:bg-[var(--student-card)]";
+}
+
 export function StudentCategoryBoard({
   initialCategory,
   groups,
@@ -50,8 +56,9 @@ export function StudentCategoryBoard({
   groups: DashboardTaskGroup[];
   summaries: CategorySummary[];
 }) {
-  const [selectedCategory, setSelectedCategory] =
-    useState<TaskCategory>(initialCategory);
+  const activeCategoryRef = useRef<TaskCategory>(initialCategory);
+  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const panelRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const groupsByCategory = useMemo(() => {
     return TASK_CATEGORIES.reduce<Record<TaskCategory, DashboardTaskGroup[]>>(
@@ -72,11 +79,32 @@ export function StudentCategoryBoard({
   }, [groups]);
 
   function handleCategoryClick(category: TaskCategory) {
-    if (category === selectedCategory) {
+    if (category === activeCategoryRef.current) {
       return;
     }
 
-    setSelectedCategory(category);
+    activeCategoryRef.current = category;
+
+    TASK_CATEGORIES.forEach((item) => {
+      const button = buttonRefs.current[item.key];
+      const panel = panelRefs.current[item.key];
+      const isSelected = item.key === category;
+
+      if (button) {
+        button.className = getCategoryButtonClass(isSelected);
+        button.setAttribute("aria-pressed", String(isSelected));
+      }
+
+      if (panel) {
+        if (isSelected) {
+          panel.classList.remove("hidden");
+          panel.classList.add("block");
+        } else {
+          panel.classList.remove("block");
+          panel.classList.add("hidden");
+        }
+      }
+    });
   }
 
   return (
@@ -90,23 +118,23 @@ export function StudentCategoryBoard({
           const status = summary?.status ?? "green";
           const completed = summary?.completed ?? 0;
           const total = summary?.total ?? 0;
-          const isSelected = selectedCategory === category.key;
+          const isSelected = initialCategory === category.key;
 
           return (
             <button
               key={category.key}
+              ref={(element) => {
+                buttonRefs.current[category.key] = element;
+              }}
               type="button"
+              aria-pressed={isSelected}
               onPointerDown={() => handleCategoryClick(category.key)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   handleCategoryClick(category.key);
                 }
               }}
-              className={
-                isSelected
-                  ? "border-r border-b border-[var(--student-border)] bg-[var(--student-card)] p-4 text-left touch-manipulation"
-                  : "border-r border-b border-[var(--student-border)] p-4 text-left touch-manipulation hover:bg-[var(--student-card)]"
-              }
+              className={getCategoryButtonClass(isSelected)}
             >
               <div className="flex items-center justify-between">
                 <span className="text-xl">{category.icon}</span>
@@ -125,7 +153,10 @@ export function StudentCategoryBoard({
       {TASK_CATEGORIES.map((category) => (
         <div
           key={category.key}
-          className={selectedCategory === category.key ? "block" : "hidden"}
+          ref={(element) => {
+            panelRefs.current[category.key] = element;
+          }}
+          className={initialCategory === category.key ? "block" : "hidden"}
         >
           <CategoryTaskPanel
             category={category.key}
