@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { StatusDot } from "@/components/common/status-dot";
-import { SwipeTaskItem } from "@/components/student/swipe-task-item";
+import { completeTaskItemAction } from "@/features/tasks/actions";
 import type {
   CategorySummary,
   DashboardTaskGroup,
@@ -207,35 +207,77 @@ function CategoryTaskPanel({
               {categoryMeta?.icon} {group.title}
             </h2>
 
-            <p className="kado-mono text-xs text-red-500">RED CAN SWIPE</p>
+            <p className="kado-mono text-xs text-[var(--student-muted)]">
+              TAP TO COMPLETE
+            </p>
           </div>
 
-          {group.items.map((item) =>
-            item.status === "red" ? (
-              <SwipeTaskItem
-                key={item.id}
-                taskItemId={item.id}
-                status={item.status}
-                title={item.title}
-              />
-            ) : (
-              <div
-                key={item.id}
-                className="flex items-center justify-between gap-3 border-b border-[var(--student-border)] px-3 py-3 last:border-b-0"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <StatusDot status={toDotStatus(item.status)} />
-                  <p className="truncate text-sm">{item.title}</p>
-                </div>
-
-                <span className="kado-mono shrink-0 text-xs text-[var(--student-muted)]">
-                  {getTaskStatusText(item.status)}
-                </span>
-              </div>
-            )
-          )}
+          {group.items.map((item) => (
+            <LightweightTaskItem
+              key={item.id}
+              taskItemId={item.id}
+              title={item.title}
+              status={item.status}
+            />
+          ))}
         </section>
       ))}
     </section>
+  );
+}
+
+function LightweightTaskItem({
+  taskItemId,
+  title,
+  status,
+}: {
+  taskItemId: string;
+  title: string;
+  status: TaskStatus;
+}) {
+  const [optimisticStatus, setOptimisticStatus] = useState<TaskStatus>(status);
+  const [isPending, startTransition] = useTransition();
+
+  const isDone = optimisticStatus === "green";
+  const canComplete = optimisticStatus === "red";
+
+  function handleComplete() {
+    if (!canComplete || isPending) {
+      return;
+    }
+
+    setOptimisticStatus("green");
+
+    startTransition(async () => {
+      const result = await completeTaskItemAction(taskItemId);
+
+      if (!result.ok) {
+        setOptimisticStatus(status);
+      }
+    });
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-[var(--student-border)] px-3 py-3 last:border-b-0">
+      <div className="flex min-w-0 items-center gap-3">
+        <StatusDot status={toDotStatus(optimisticStatus)} />
+        <p className="truncate text-sm">{title}</p>
+      </div>
+
+      {canComplete ? (
+        <button
+          type="button"
+          onPointerDown={handleComplete}
+          disabled={isPending}
+          className="kado-mono shrink-0 border border-[var(--student-border)] px-3 py-1.5 text-xs text-green-400 touch-manipulation disabled:opacity-50"
+        >
+          {isPending ? "..." : "完成"}
+        </button>
+      ) : (
+        <span className="kado-mono shrink-0 text-xs text-[var(--student-muted)]">
+          {getTaskStatusText(optimisticStatus)}
+        </span>
+      )}
+    </div>
   );
 }
