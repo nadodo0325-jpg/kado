@@ -70,7 +70,19 @@ export function StudentStatusPanel({
     });
   }
 
-  function handleStatusChange(statusKey: StudentStatus) {
+  function paintStatus(statusKey: StudentStatus) {
+    statusKeys.forEach((key) => {
+      const input = inputRefs.current[key];
+
+      if (input) {
+        input.checked = key === statusKey;
+      }
+    });
+
+    activeStatusRef.current = statusKey;
+  }
+
+  function handleStatusSelect(statusKey: StudentStatus) {
     if (activeStatusRef.current === statusKey) {
       return;
     }
@@ -79,7 +91,8 @@ export function StudentStatusPanel({
     const requestId = requestIdRef.current + 1;
 
     requestIdRef.current = requestId;
-    activeStatusRef.current = statusKey;
+
+    paintStatus(statusKey);
     setHelperText("saving");
 
     window.setTimeout(() => {
@@ -140,7 +153,11 @@ export function StudentStatusPanel({
           const isSelected = initialStatus === statusKey;
 
           return (
-            <label key={statusKey} className="block touch-manipulation">
+            <label
+              key={statusKey}
+              className="block touch-manipulation"
+              onPointerDown={() => handleStatusSelect(statusKey)}
+            >
               <input
                 ref={(element) => {
                   inputRefs.current[statusKey] = element;
@@ -149,7 +166,7 @@ export function StudentStatusPanel({
                 name="student-current-status"
                 value={statusKey}
                 defaultChecked={isSelected}
-                onChange={() => handleStatusChange(statusKey)}
+                onChange={() => handleStatusSelect(statusKey)}
                 className="peer sr-only"
               />
 
