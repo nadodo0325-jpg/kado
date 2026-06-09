@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { flushSync } from "react-dom";
 import { StatusDot } from "@/components/common/status-dot";
 import { SwipeTaskItem } from "@/components/student/swipe-task-item";
 import type {
@@ -54,19 +53,30 @@ export function StudentCategoryBoard({
   const [selectedCategory, setSelectedCategory] =
     useState<TaskCategory>(initialCategory);
 
-  const selectedGroups = useMemo(
-    () => groups.filter((group) => group.category === selectedCategory),
-    [groups, selectedCategory]
-  );
+  const groupsByCategory = useMemo(() => {
+    return TASK_CATEGORIES.reduce<Record<TaskCategory, DashboardTaskGroup[]>>(
+      (result, category) => {
+        result[category.key] = groups.filter(
+          (group) => group.category === category.key
+        );
+
+        return result;
+      },
+      {
+        homework: [],
+        quiz: [],
+        todo: [],
+        others: [],
+      }
+    );
+  }, [groups]);
 
   function handleCategoryClick(category: TaskCategory) {
     if (category === selectedCategory) {
       return;
     }
 
-    flushSync(() => {
-      setSelectedCategory(category);
-    });
+    setSelectedCategory(category);
   }
 
   return (
@@ -112,7 +122,17 @@ export function StudentCategoryBoard({
         })}
       </section>
 
-      <CategoryTaskPanel category={selectedCategory} groups={selectedGroups} />
+      {TASK_CATEGORIES.map((category) => (
+        <div
+          key={category.key}
+          className={selectedCategory === category.key ? "block" : "hidden"}
+        >
+          <CategoryTaskPanel
+            category={category.key}
+            groups={groupsByCategory[category.key]}
+          />
+        </div>
+      ))}
     </>
   );
 }
@@ -155,6 +175,7 @@ function CategoryTaskPanel({
             <h2 className="text-sm font-semibold">
               {categoryMeta?.icon} {group.title}
             </h2>
+
             <p className="kado-mono text-xs text-red-500">RED CAN SWIPE</p>
           </div>
 
