@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { setMoodCheckinAction } from "@/features/status/actions";
+import { setMoodCheckinSilentAction } from "@/features/status/actions";
 import type { TaskCategory } from "@/lib/constants/categories";
 import { MOOD_STATUS, type MoodStatus } from "@/lib/constants/status";
 
@@ -109,7 +109,11 @@ export function MoodCheckinPanel({
       formData.set("mood", moodKey);
       formData.set("category", selectedCategory);
 
-      await setMoodCheckinAction(formData);
+      const response = await setMoodCheckinSilentAction(formData);
+
+      if (!response.ok) {
+        throw new Error(response.error);
+      }
 
       if (requestIdRef.current !== requestId) {
         return;
