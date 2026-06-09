@@ -30,6 +30,18 @@ function getCategoryLabel(categoryKey: TaskCategory) {
   return TASK_CATEGORIES.find((category) => category.key === categoryKey);
 }
 
+function getTaskStatusText(status: TaskStatus) {
+  if (status === "green") {
+    return "DONE";
+  }
+
+  if (status === "processing") {
+    return "PENDING";
+  }
+
+  return "TODO";
+}
+
 export function StudentCategoryBoard({
   initialCategory,
   groups,
@@ -143,17 +155,33 @@ function CategoryTaskPanel({
             <h2 className="text-sm font-semibold">
               {categoryMeta?.icon} {group.title}
             </h2>
-            <p className="kado-mono text-xs text-red-500">SWIPE RIGHT</p>
+            <p className="kado-mono text-xs text-red-500">RED CAN SWIPE</p>
           </div>
 
-          {group.items.map((item) => (
-            <SwipeTaskItem
-              key={item.id}
-              taskItemId={item.id}
-              status={item.status}
-              title={item.title}
-            />
-          ))}
+          {group.items.map((item) =>
+            item.status === "red" ? (
+              <SwipeTaskItem
+                key={item.id}
+                taskItemId={item.id}
+                status={item.status}
+                title={item.title}
+              />
+            ) : (
+              <div
+                key={item.id}
+                className="flex items-center justify-between gap-3 border-b border-[var(--student-border)] px-3 py-3 last:border-b-0"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <StatusDot status={toDotStatus(item.status)} />
+                  <p className="truncate text-sm">{item.title}</p>
+                </div>
+
+                <span className="kado-mono shrink-0 text-xs text-[var(--student-muted)]">
+                  {getTaskStatusText(item.status)}
+                </span>
+              </div>
+            )
+          )}
         </section>
       ))}
     </section>
