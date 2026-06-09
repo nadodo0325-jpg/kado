@@ -48,10 +48,6 @@ export function StudentCategoryBoard({
 
   function handleCategoryClick(category: TaskCategory) {
     setSelectedCategory(category);
-
-    const url = new URL(window.location.href);
-    url.searchParams.set("category", category);
-    window.history.replaceState(null, "", `${url.pathname}?${url.search}`);
   }
 
   return (
@@ -74,8 +70,8 @@ export function StudentCategoryBoard({
               onClick={() => handleCategoryClick(category.key)}
               className={
                 isSelected
-                  ? "kado-transition border-r border-b border-[var(--student-border)] bg-[var(--student-card)] p-4 text-left"
-                  : "kado-transition border-r border-b border-[var(--student-border)] p-4 text-left hover:bg-[var(--student-card)]"
+                  ? "border-r border-b border-[var(--student-border)] bg-[var(--student-card)] p-4 text-left touch-manipulation"
+                  : "border-r border-b border-[var(--student-border)] p-4 text-left touch-manipulation hover:bg-[var(--student-card)]"
               }
             >
               <div className="flex items-center justify-between">
@@ -92,10 +88,7 @@ export function StudentCategoryBoard({
         })}
       </section>
 
-      <CategoryTaskPanel
-        category={selectedCategory}
-        groups={selectedGroups}
-      />
+      <CategoryTaskPanel category={selectedCategory} groups={selectedGroups} />
     </>
   );
 }
