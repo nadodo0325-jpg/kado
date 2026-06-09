@@ -18,118 +18,92 @@ type MoodCheckinPanelProps = {
   result?: string;
 };
 
-function getMoodButtonClass(isSelected: boolean) {
-  return isSelected
-    ? "w-full border border-green-500 bg-[var(--green-soft)] px-3 py-3 text-left touch-manipulation"
-    : "w-full border border-[var(--student-border)] px-3 py-3 text-left touch-manipulation hover:bg-[var(--student-card)]";
-}
-
 export function MoodCheckinPanel({
   currentMood,
   selectedCategory,
   result,
 }: MoodCheckinPanelProps) {
   const activeMoodRef = useRef<MoodStatus | null>(currentMood);
-  const pendingRef = useRef(false);
-
-  const buttonRefs = useRef<
-    Partial<Record<MoodStatus, HTMLButtonElement | null>>
-  >({});
-
-  const labelRefs = useRef<Partial<Record<MoodStatus, HTMLSpanElement | null>>>(
+  const requestIdRef = useRef(0);
+  const statusRef = useRef<HTMLParagraphElement | null>(null);
+  const helperRef = useRef<HTMLParagraphElement | null>(null);
+  const inputRefs = useRef<Partial<Record<MoodStatus, HTMLInputElement | null>>>(
     {}
   );
 
-  const statusRef = useRef<HTMLParagraphElement | null>(null);
-  const messageRef = useRef<HTMLDivElement | null>(null);
-
-  function setMessage(type: "idle" | "saving" | "updated" | "failed") {
+  function setHelperText(type: "idle" | "saving" | "updated" | "failed") {
     const status = statusRef.current;
-    const message = messageRef.current;
+    const helper = helperRef.current;
 
     if (status) {
-      if (type === "saving") {
-        status.textContent = "SAVING";
-      } else if (activeMoodRef.current) {
-        status.textContent = "DONE";
-      } else {
-        status.textContent = "REQUIRED";
-      }
+      status.textContent =
+        type === "saving"
+          ? "SAVING"
+          : activeMoodRef.current
+            ? "DONE"
+            : "REQUIRED";
     }
 
-    if (!message) {
+    if (!helper) {
       return;
     }
 
     if (type === "saving") {
-      message.textContent = "正在儲存今日心情氣象...";
-      message.className =
-        "border-b border-[var(--student-border)] px-3 py-2 text-xs text-[var(--student-muted)]";
-      message.hidden = false;
+      helper.textContent = "正在背景儲存，不影響你繼續操作。";
+      helper.className = "mt-1 text-xs text-[var(--student-muted)]";
       return;
     }
 
     if (type === "updated") {
-      message.textContent = "今日心情氣象已更新。";
-      message.className =
-        "border-b border-[var(--student-border)] px-3 py-2 text-xs text-green-400";
-      message.hidden = false;
+      helper.textContent = "今日心情氣象已更新。";
+      helper.className = "mt-1 text-xs text-green-400";
       return;
     }
 
     if (type === "failed") {
-      message.textContent = "更新失敗，請稍後再試。";
-      message.className =
-        "border-b border-[var(--student-border)] px-3 py-2 text-xs text-red-400";
-      message.hidden = false;
+      helper.textContent = "更新失敗，已還原上一個狀態。";
+      helper.className = "mt-1 text-xs text-red-400";
       return;
     }
 
-    message.hidden = true;
+    helper.textContent = "每天第一次進入時，先選一個今天的狀態。";
+    helper.className = "mt-1 text-xs text-[var(--student-muted)]";
   }
 
-  function paintMood(moodKey: MoodStatus | null) {
-    activeMoodRef.current = moodKey;
+  function rollbackMood(previousMood: MoodStatus | null) {
+    activeMoodRef.current = previousMood;
 
     moodKeys.forEach((key) => {
-      const button = buttonRefs.current[key];
-      const label = labelRefs.current[key];
-      const isSelected = key === moodKey;
+      const input = inputRefs.current[key];
 
-      if (button) {
-        button.className = getMoodButtonClass(isSelected);
-        button.setAttribute("aria-pressed", String(isSelected));
-      }
-
-      if (label) {
-        label.textContent = MOOD_STATUS[key].label;
+      if (input) {
+        input.checked = key === previousMood;
       }
     });
   }
 
-  function handleMoodClick(moodKey: MoodStatus) {
-    const previousMood = activeMoodRef.current;
-
-    paintMood(moodKey);
-    setMessage("saving");
-
-    const selectedLabel = labelRefs.current[moodKey];
-    if (selectedLabel) {
-      selectedLabel.textContent = "儲存中...";
-    }
-
-    if (pendingRef.current) {
+  function handleMoodChange(moodKey: MoodStatus) {
+    if (activeMoodRef.current === moodKey) {
       return;
     }
 
-    pendingRef.current = true;
+    const previousMood = activeMoodRef.current;
+    const requestId = requestIdRef.current + 1;
+
+    requestIdRef.current = requestId;
+    activeMoodRef.current = moodKey;
+    setHelperText("saving");
 
     window.setTimeout(() => {
-      void saveMood(moodKey, previousMood);
+      void saveMood(moodKey, previousMood, requestId);
     }, 0);
   }
 
-  async function saveMood(moodKey: MoodStatus, previousMood: MoodStatus | null) {
+  async function saveMood(
+    moodKey: MoodStatus,
+    previousMood: MoodStatus | null,
+    requestId: number
+  ) {
     try {
       const formData = new FormData();
       formData.set("mood", moodKey);
@@ -137,30 +111,42 @@ export function MoodCheckinPanel({
 
       await setMoodCheckinAction(formData);
 
-      const selectedLabel = labelRefs.current[moodKey];
-      if (selectedLabel) {
-        selectedLabel.textContent = MOOD_STATUS[moodKey].label;
+      if (requestIdRef.current !== requestId) {
+        return;
       }
 
-      setMessage("updated");
+      setHelperText("updated");
     } catch {
-      paintMood(previousMood);
-      setMessage("failed");
-    } finally {
-      pendingRef.current = false;
+      if (requestIdRef.current !== requestId) {
+        return;
+      }
+
+      rollbackMood(previousMood);
+      setHelperText("failed");
     }
   }
 
-  const initialMessageType =
-    result === "updated" || result === "failed" ? result : "idle";
+  const initialHelperText =
+    result === "updated"
+      ? "今日心情氣象已更新。"
+      : result === "failed"
+        ? "更新失敗，請稍後再試。"
+        : "每天第一次進入時，先選一個今天的狀態。";
+
+  const initialHelperClass =
+    result === "updated"
+      ? "mt-1 text-xs text-green-400"
+      : result === "failed"
+        ? "mt-1 text-xs text-red-400"
+        : "mt-1 text-xs text-[var(--student-muted)]";
 
   return (
     <section className="mt-5 border border-[var(--student-border)]">
       <div className="flex items-center justify-between border-b border-[var(--student-border)] px-3 py-2">
         <div>
           <h2 className="text-sm font-semibold">今日能量 Check-in</h2>
-          <p className="mt-1 text-xs text-[var(--student-muted)]">
-            每天第一次進入時，先選一個今天的狀態。
+          <p ref={helperRef} className={initialHelperClass}>
+            {initialHelperText}
           </p>
         </div>
 
@@ -172,55 +158,32 @@ export function MoodCheckinPanel({
         </p>
       </div>
 
-      <div
-        ref={messageRef}
-        hidden={initialMessageType === "idle"}
-        className={
-          initialMessageType === "updated"
-            ? "border-b border-[var(--student-border)] px-3 py-2 text-xs text-green-400"
-            : initialMessageType === "failed"
-              ? "border-b border-[var(--student-border)] px-3 py-2 text-xs text-red-400"
-              : "border-b border-[var(--student-border)] px-3 py-2 text-xs text-[var(--student-muted)]"
-        }
-      >
-        {initialMessageType === "updated"
-          ? "今日心情氣象已更新。"
-          : initialMessageType === "failed"
-            ? "更新失敗，請稍後再試。"
-            : ""}
-      </div>
-
       <div className="grid grid-cols-2 gap-2 p-3 md:grid-cols-4">
         {moodKeys.map((moodKey) => {
           const mood = MOOD_STATUS[moodKey];
           const isSelected = currentMood === moodKey;
 
           return (
-            <button
-              key={moodKey}
-              ref={(element) => {
-                buttonRefs.current[moodKey] = element;
-              }}
-              type="button"
-              aria-pressed={isSelected}
-              onPointerDown={() => handleMoodClick(moodKey)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  handleMoodClick(moodKey);
-                }
-              }}
-              className={getMoodButtonClass(isSelected)}
-            >
-              <span className="block text-lg">{mood.icon}</span>
-              <span
+            <label key={moodKey} className="block touch-manipulation">
+              <input
                 ref={(element) => {
-                  labelRefs.current[moodKey] = element;
+                  inputRefs.current[moodKey] = element;
                 }}
-                className="mt-2 block text-xs text-[var(--student-muted)]"
-              >
-                {mood.label}
+                type="radio"
+                name="student-mood-checkin"
+                value={moodKey}
+                defaultChecked={isSelected}
+                onChange={() => handleMoodChange(moodKey)}
+                className="peer sr-only"
+              />
+
+              <span className="block w-full border border-[var(--student-border)] px-3 py-3 text-left peer-checked:border-green-500 peer-checked:bg-[var(--green-soft)]">
+                <span className="block text-lg">{mood.icon}</span>
+                <span className="mt-2 block text-xs text-[var(--student-muted)]">
+                  {mood.label}
+                </span>
               </span>
-            </button>
+            </label>
           );
         })}
       </div>
