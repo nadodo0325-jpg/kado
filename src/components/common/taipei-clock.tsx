@@ -25,11 +25,9 @@ function formatTaipeiDateTime(date: Date) {
 }
 
 export function TaipeiClock() {
-  const [now, setNow] = useState<Date | null>(null);
+  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    setNow(new Date());
-
     const timer = window.setInterval(() => {
       setNow(new Date());
     }, 30 * 1000);
@@ -40,10 +38,15 @@ export function TaipeiClock() {
   }, []);
 
   return (
-    <div className="border border-[var(--kado-border)] bg-white px-3 py-2 text-right">
-      <p className="kado-mono text-xs text-[var(--kado-muted)]">SYSTEM TIME</p>
-      <p className="mt-1 text-xs font-medium">
-        {now ? formatTaipeiDateTime(now) : "讀取時間中"}
+    <div className="shrink-0 border border-[var(--kado-border)] bg-white px-3 py-2 text-right">
+      <p className="kado-mono whitespace-nowrap text-xs text-[var(--kado-muted)]">
+        SYSTEM TIME
+      </p>
+      <p
+        className="mt-1 whitespace-nowrap text-xs font-medium"
+        suppressHydrationWarning
+      >
+        {formatTaipeiDateTime(now)}
       </p>
     </div>
   );

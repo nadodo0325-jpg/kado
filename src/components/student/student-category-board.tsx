@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { StatusDot } from "@/components/common/status-dot";
 import { completeTaskItemSilentAction } from "@/features/tasks/actions";
 import type {
@@ -218,7 +218,7 @@ function CategoryTaskPanel({
           </div>
 
           {group.items.map((item) => (
-            <SwipeTaskRow
+            <TaskCompleteRow
               key={item.id}
               taskItemId={item.id}
               title={item.title}
@@ -232,7 +232,7 @@ function CategoryTaskPanel({
   );
 }
 
-function SwipeTaskRow({
+function TaskCompleteRow({
   taskItemId,
   title,
   status,
@@ -243,34 +243,18 @@ function SwipeTaskRow({
   status: TaskStatus;
   onLocalStatusChange: (taskItemId: string, nextStatus: TaskStatus) => void;
 }) {
-  const rowRef = useRef<HTMLDivElement | null>(null);
-  const startXRef = useRef<number | null>(null);
-  const [dragX, setDragX] = useState(0);
   const [localStatus, setLocalStatus] = useState<TaskStatus>(status);
   const [isPending, startTransition] = useTransition();
 
   const canComplete = localStatus === "red";
-  const maxDrag = 112;
 
-  function vibrate() {
-    if ("vibrate" in window.navigator) {
-      window.navigator.vibrate(18);
-    }
-  }
-
-  function resetDrag() {
-    startXRef.current = null;
-    setDragX(0);
-  }
-
-  function completeTask() {
+  function handleComplete() {
     if (!canComplete || isPending) return;
 
     const previousStatus = localStatus;
 
     setLocalStatus("green");
     onLocalStatusChange(taskItemId, "green");
-    vibrate();
 
     startTransition(async () => {
       const result = await completeTaskItemSilentAction(taskItemId);
@@ -282,80 +266,27 @@ function SwipeTaskRow({
     });
   }
 
-  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (!canComplete || isPending) return;
-
-    startXRef.current = event.clientX;
-
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      // 部分瀏覽器不支援時忽略，不影響完成任務。
-    }
-  }
-
-  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (startXRef.current === null || !canComplete || isPending) return;
-
-    const diff = Math.max(0, event.clientX - startXRef.current);
-    setDragX(Math.min(diff, maxDrag));
-  }
-
-  function handlePointerUp() {
-    if (!canComplete || isPending) {
-      resetDrag();
-      return;
-    }
-
-    const rowWidth = rowRef.current?.offsetWidth ?? 320;
-    const threshold = rowWidth * 0.3;
-
-    if (dragX >= threshold) {
-      completeTask();
-    }
-
-    resetDrag();
-  }
-
   return (
-    <div
-      ref={rowRef}
-      className="relative overflow-hidden border-b border-[var(--student-border)] last:border-b-0"
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={resetDrag}
-    >
-      <div className="absolute inset-y-0 left-0 flex items-center bg-[var(--green-soft)] px-3 text-xs text-green-400">
-        放開完成
+    <div className="flex items-center justify-between gap-3 border-b border-[var(--student-border)] px-3 py-3 last:border-b-0">
+      <div className="flex min-w-0 items-center gap-3">
+        <StatusDot status={toDotStatus(localStatus)} />
+        <p className="truncate text-sm">{title}</p>
       </div>
 
-      <div
-        className="relative flex touch-pan-y items-center justify-between gap-3 bg-[var(--student-bg)] px-3 py-3 transition-transform duration-150"
-        style={{
-          transform: canComplete ? `translateX(${dragX}px)` : "translateX(0px)",
-        }}
-      >
-        <div className="flex min-w-0 items-center gap-3">
-          <StatusDot status={toDotStatus(localStatus)} />
-          <p className="truncate text-sm">{title}</p>
-        </div>
-
-        {canComplete ? (
-          <button
-            type="button"
-            onClick={completeTask}
-            disabled={isPending}
-            className="kado-mono shrink-0 border border-[var(--student-border)] px-3 py-1.5 text-xs text-green-400 touch-manipulation disabled:opacity-50"
-          >
-            {isPending ? "..." : "完成"}
-          </button>
-        ) : (
-          <span className="kado-mono shrink-0 text-xs text-[var(--student-muted)]">
-            {getTaskStatusText(localStatus)}
-          </span>
-        )}
-      </div>
+      {canComplete ? (
+        <button
+          type="button"
+          onClick={handleComplete}
+          disabled={isPending}
+          className="kado-mono shrink-0 border border-[var(--student-border)] px-3 py-1.5 text-xs text-green-400 touch-manipulation disabled:opacity-50"
+        >
+          {isPending ? "..." : "完成"}
+        </button>
+      ) : (
+        <span className="kado-mono shrink-0 text-xs text-[var(--student-muted)]">
+          {getTaskStatusText(localStatus)}
+        </span>
+      )}
     </div>
   );
 }
