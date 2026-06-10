@@ -1,8 +1,9 @@
 import { LogoutButton } from "@/components/auth/logout-button";
 import { SectionCard } from "@/components/common/section-card";
 import { StatusDot } from "@/components/common/status-dot";
-import { PageHeader } from "@/components/layout/page-header";
 import { TaipeiClock } from "@/components/common/taipei-clock";
+import { PageHeader } from "@/components/layout/page-header";
+import { ContactBookParserPanel } from "@/components/teacher/contact-book-parser-panel";
 import {
   confirmStudentTaskStatusAction,
   publishTeacherTaskAction,
@@ -15,7 +16,6 @@ import {
 } from "@/features/tasks/teacher-queries";
 import { TASK_CATEGORIES } from "@/lib/constants/categories";
 import type { TaskStatus } from "@/lib/constants/status";
-import { ContactBookParserPanel } from "@/components/teacher/contact-book-parser-panel";
 
 const errorMessages: Record<string, string> = {
   invalid_category: "請選擇正確的任務分類。",
@@ -47,6 +47,7 @@ function toDotStatus(status: TaskStatus): "red" | "green" | "yellow" {
 
   return "red";
 }
+
 function getCategoryMeta(categoryKey: string) {
   return TASK_CATEGORIES.find((category) => category.key === categoryKey);
 }
@@ -134,203 +135,254 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
   const taskRange = params?.taskRange === "month" ? "month" : "today";
 
   const { profile, className, students, publishedTasks, rows } =
-  await getTeacherDashboardData();
+    await getTeacherDashboardData();
 
   const incompleteRows = rows.filter((row) => row.status !== "green");
-  const visiblePublishedTasks = getVisiblePublishedTasks(
-  publishedTasks,
-  taskRange
-);
 
-const publishedTaskDateGroups = groupPublishedTasksByDate(visiblePublishedTasks);
+  const visiblePublishedTasks = getVisiblePublishedTasks(
+    publishedTasks,
+    taskRange
+  );
+
+  const publishedTaskDateGroups = groupPublishedTasksByDate(
+    visiblePublishedTasks
+  );
 
   return (
     <main className="teacher-shell">
       <section className="mx-auto min-h-screen w-full max-w-6xl px-4 py-5">
         <PageHeader
           eyebrow="TEACHER"
-          title={`${profile.display_name} 的教師發布中心`}
+          title={`${profile.display_name} 的教師工作台`}
           right={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-nowrap items-center justify-end gap-2 whitespace-nowrap">
               <TaipeiClock />
-              
-              <a
-               href="/teacher/ai-settings"
-               className="kado-transition border border-[var(--kado-border)] px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
-              >
-               AI 設定
-              </a>
 
               <a
-               href="#publish-task"
-               className="kado-transition bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+                href="/teacher/ai-settings"
+                className="kado-transition shrink-0 border border-[var(--kado-border)] px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
               >
-              新增任務
+                AI 設定
               </a>
 
-              <LogoutButton />
+              <div className="shrink-0">
+                <LogoutButton />
+              </div>
             </div>
-          }        
+          }
         />
+
         {confirmed ? (
-         <div className="mt-4 border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-700">
-           已確認完成，該項目已轉為綠燈。
-         </div>
+          <div className="mt-4 border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-700">
+            已確認完成，該項目已轉為綠燈。
+          </div>
         ) : null}
 
-        <section className="mt-5 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-          <SectionCard>
-            <div className="border-b border-[var(--kado-border)] px-4 py-3">
-              <p className="text-sm font-semibold">快速發布</p>
-              <p className="mt-1 text-xs text-[var(--kado-muted)]">
-                每一行會變成一個任務細項，發布後全班學生預設紅燈。
-              </p>
-            </div>
+        <section className="mt-5 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+          <PublishedTaskList
+            dateGroups={publishedTaskDateGroups}
+            taskRange={taskRange}
+          />
 
-            <form id="publish-task" action={publishTeacherTaskAction}>
-              <div className="border-b border-[var(--kado-border)] p-4">
-                <label className="text-sm font-medium" htmlFor="task-category">
-                  任務分類
-                </label>
-
-                <select
-                  id="task-category"
-                  name="category"
-                  defaultValue="homework"
-                  className="mt-2 w-full border border-[var(--kado-border)] bg-white px-3 py-3 text-sm outline-none focus:border-zinc-500"
-                >
-                 {TASK_CATEGORIES.map((category) => (
-                   <option key={category.key} value={category.key}>
-                     {category.icon} {category.label}
-                   </option>
-                 ))}
-               </select>
-
-               <label className="mt-4 block text-sm font-medium" htmlFor="item-kind">
-                  任務類型
-               </label>
-
-               <select
-                 id="item-kind"
-                 name="itemKind"
-                 defaultValue="normal"
-                 className="mt-2 w-full border border-[var(--kado-border)] bg-white px-3 py-3 text-sm outline-none focus:border-zinc-500"
-               >
-                <option value="normal">一般任務｜學生自主完成</option>
-                <option value="payment">費用｜家長收到了解後轉黃燈</option>
-                <option value="form">回條｜教師確認後轉綠燈</option>
-              </select>
-            </div>
-
-              <div className="p-4">
-                {published ? (
-                  <div className="mb-4 border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-700">
-                    任務已發布到班級。
-                  </div>
-                ) : null}
-
-                {error ? (
-                  <div className="mb-4 border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-600">
-                    {error}
-                  </div>
-                ) : null}
-
-                <label className="text-sm font-medium" htmlFor="task-title">
-                  任務看板標題
-                </label>
-                <input
-                  id="task-title"
-                  name="title"
-                  className="mt-2 w-full border border-[var(--kado-border)] px-3 py-3 text-sm outline-none focus:border-zinc-500"
-                  placeholder="例如：5/20 作業看板"
-                />
-
-                <label
-                  className="mt-4 block text-sm font-medium"
-                  htmlFor="task-content"
-                >
-                  任務細項
-                </label>
-                <textarea
-                  id="task-content"
-                  name="itemsText"
-                  className="mt-2 min-h-32 w-full resize-none border border-[var(--kado-border)] p-3 text-sm outline-none focus:border-zinc-500"
-                  placeholder={"數學講義 P.45\n英文雜誌 L3 句子仿寫"}
-                />
-
-                <button
-                  type="submit"
-                  className="kado-transition mt-3 w-full bg-zinc-950 px-4 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
-                >
-                  發布到全班
-                </button>
-              </div>
-            </form>
-          </SectionCard>
-
-          <ContactBookParserPanel />
-
-          <SectionCard>
-            <div className="flex items-center justify-between border-b border-[var(--kado-border)] px-4 py-3">
-              <div>
-                <p className="text-sm font-semibold">班級狀態</p>
-                <p className="mt-1 text-xs text-[var(--kado-muted)]">
-                  {className
-                    ? "即時統計學生紅綠燈狀態。"
-                    : "目前尚未建立班級或任務資料。"}
-                </p>
-              </div>
-
-              <p className="kado-mono text-xs text-[var(--kado-muted)]">
-                {className ?? "NO CLASS"}
-              </p>
-            </div>
-
-            {students.length > 0 ? (
-              <div className="divide-y divide-[var(--kado-border)]">
-                {students.map((student) => (
-                  <StudentStatusRow key={student.studentId} student={student} />
-                ))}
-              </div>
-            ) : (
-              <div className="px-4 py-8">
-                <p className="text-sm text-[var(--kado-muted)]">
-                  目前沒有學生任務資料。建立班級、加入學生並發布任務後，這裡會顯示統計。
-                </p>
-              </div>
-            )}
-
-            <div className="border-t border-[var(--kado-border)] p-4">
-              {showIncomplete ? (
-                <a
-                  href="/teacher"
-                  className="kado-transition block w-full border border-[var(--kado-border)] px-4 py-3 text-center text-sm font-semibold hover:bg-zinc-50"
-                >
-                  回到全部狀態
-                </a>
-              ) : (
-                <a
-                  href="/teacher?filter=incomplete"
-                  className="kado-transition block w-full border border-[var(--kado-border)] px-4 py-3 text-center text-sm font-semibold hover:bg-zinc-50"
-                >
-                  篩選未完成名單
-                </a>
-              )}
-            </div>
-          </SectionCard>
+          <ClassStatusPanel
+            classNameValue={className}
+            students={students}
+            showIncomplete={showIncomplete}
+          />
         </section>
-        <PublishedTaskList 
-          dateGroups={publishedTaskDateGroups}
-          taskRange={taskRange}
-        />
 
-        {showIncomplete ? (
-          <IncompleteList rows={incompleteRows} />
-        ) : null}
+        {showIncomplete ? <IncompleteList rows={incompleteRows} /> : null}
+
+        <section className="mt-5">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold">教師發布中心</p>
+              <p className="mt-1 text-xs text-[var(--kado-muted)]">
+                發布任務與 AI 聯絡簿拆解都保留在下方，避免首頁最上方過度擁擠。
+              </p>
+            </div>
+
+            <a
+              href="#publish-task"
+              className="kado-transition inline-flex shrink-0 items-center justify-center bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+            >
+              ＋ 新增任務
+            </a>
+          </div>
+
+          <section className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+            <QuickPublishPanel published={published} error={error} />
+
+            <ContactBookParserPanel />
+          </section>
+        </section>
       </section>
     </main>
   );
 }
+
+function QuickPublishPanel({
+  published,
+  error,
+}: {
+  published: boolean;
+  error: string | null;
+}) {
+  return (
+    <SectionCard>
+      <div
+        id="publish-task"
+        className="border-b border-[var(--kado-border)] px-4 py-3"
+      >
+        <p className="text-sm font-semibold">快速發布</p>
+        <p className="mt-1 text-xs text-[var(--kado-muted)]">
+          每一行會變成一個任務細項，發布後全班學生預設紅燈。
+        </p>
+      </div>
+
+      <form action={publishTeacherTaskAction}>
+        <div className="border-b border-[var(--kado-border)] p-4">
+          <label className="text-sm font-medium" htmlFor="task-category">
+            任務分類
+          </label>
+
+          <select
+            id="task-category"
+            name="category"
+            defaultValue="homework"
+            className="mt-2 w-full border border-[var(--kado-border)] bg-white px-3 py-3 text-sm outline-none focus:border-zinc-500"
+          >
+            {TASK_CATEGORIES.map((category) => (
+              <option key={category.key} value={category.key}>
+                {category.icon} {category.label}
+              </option>
+            ))}
+          </select>
+
+          <label className="mt-4 block text-sm font-medium" htmlFor="item-kind">
+            任務類型
+          </label>
+
+          <select
+            id="item-kind"
+            name="itemKind"
+            defaultValue="normal"
+            className="mt-2 w-full border border-[var(--kado-border)] bg-white px-3 py-3 text-sm outline-none focus:border-zinc-500"
+          >
+            <option value="normal">一般任務｜學生自主完成</option>
+            <option value="payment">費用｜家長收到了解後轉黃燈</option>
+            <option value="form">回條｜教師確認後轉綠燈</option>
+          </select>
+        </div>
+
+        <div className="p-4">
+          {published ? (
+            <div className="mb-4 border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-700">
+              任務已發布到班級。
+            </div>
+          ) : null}
+
+          {error ? (
+            <div className="mb-4 border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-600">
+              {error}
+            </div>
+          ) : null}
+
+          <label className="text-sm font-medium" htmlFor="task-title">
+            任務看板標題
+          </label>
+
+          <input
+            id="task-title"
+            name="title"
+            className="mt-2 w-full border border-[var(--kado-border)] px-3 py-3 text-sm outline-none focus:border-zinc-500"
+            placeholder="例如：5/20 作業看板"
+          />
+
+          <label className="mt-4 block text-sm font-medium" htmlFor="task-content">
+            任務細項
+          </label>
+
+          <textarea
+            id="task-content"
+            name="itemsText"
+            className="mt-2 min-h-32 w-full resize-none border border-[var(--kado-border)] p-3 text-sm outline-none focus:border-zinc-500"
+            placeholder={"數學講義 P.45\n英文雜誌 L3 句子仿寫"}
+          />
+
+          <button
+            type="submit"
+            className="kado-transition mt-3 w-full bg-zinc-950 px-4 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
+          >
+            發布到全班
+          </button>
+        </div>
+      </form>
+    </SectionCard>
+  );
+}
+
+function ClassStatusPanel({
+  classNameValue,
+  students,
+  showIncomplete,
+}: {
+  classNameValue: string | null;
+  students: TeacherStudentSummary[];
+  showIncomplete: boolean;
+}) {
+  return (
+    <SectionCard>
+      <div className="flex items-center justify-between border-b border-[var(--kado-border)] px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold">班級狀態與學生名單</p>
+          <p className="mt-1 text-xs text-[var(--kado-muted)]">
+            {classNameValue
+              ? "即時統計學生紅綠燈狀態。"
+              : "目前尚未建立班級或任務資料。"}
+          </p>
+        </div>
+
+        <p className="kado-mono text-xs text-[var(--kado-muted)]">
+          {classNameValue ?? "NO CLASS"}
+        </p>
+      </div>
+
+      {students.length > 0 ? (
+        <div className="divide-y divide-[var(--kado-border)]">
+          {students.map((student) => (
+            <StudentStatusRow key={student.studentId} student={student} />
+          ))}
+        </div>
+      ) : (
+        <div className="px-4 py-8">
+          <p className="text-sm text-[var(--kado-muted)]">
+            目前沒有學生任務資料。建立班級、加入學生並發布任務後，這裡會顯示統計。
+          </p>
+        </div>
+      )}
+
+      <div className="border-t border-[var(--kado-border)] p-4">
+        {showIncomplete ? (
+          <a
+            href="/teacher"
+            className="kado-transition block w-full border border-[var(--kado-border)] px-4 py-3 text-center text-sm font-semibold hover:bg-zinc-50"
+          >
+            回到全部狀態
+          </a>
+        ) : (
+          <a
+            href="/teacher?filter=incomplete"
+            className="kado-transition block w-full border border-[var(--kado-border)] px-4 py-3 text-center text-sm font-semibold hover:bg-zinc-50"
+          >
+            篩選未完成名單
+          </a>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
 function PublishedTaskList({
   dateGroups,
   taskRange,
@@ -348,16 +400,16 @@ function PublishedTaskList({
   );
 
   return (
-    <section className="mt-5 border border-[var(--kado-border)] bg-white">
+    <section className="border border-[var(--kado-border)] bg-white">
       <div className="flex flex-col gap-3 border-b border-[var(--kado-border)] px-4 py-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-sm font-semibold">已發布任務</p>
+          <p className="text-sm font-semibold">今日已發布任務</p>
           <p className="mt-1 text-xs text-[var(--kado-muted)]">
-            預設只顯示今日任務，歷史紀錄保留近 30 天方便月考前回看。
+            預設只顯示今日任務，歷史紀錄保留近 30 天方便回看。
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <a
             href="/teacher"
             className={
@@ -490,7 +542,7 @@ function StudentStatusRow({ student }: { student: TeacherStudentSummary }) {
 
 function IncompleteList({ rows }: { rows: TeacherDashboardRow[] }) {
   return (
-    <section className="mt-4 border border-[var(--kado-border)] bg-white">
+    <section className="mt-5 border border-[var(--kado-border)] bg-white">
       <div className="flex items-center justify-between border-b border-[var(--kado-border)] px-4 py-3">
         <div>
           <p className="text-sm font-semibold">未完成名單</p>
@@ -524,28 +576,29 @@ function IncompleteList({ rows }: { rows: TeacherDashboardRow[] }) {
               </div>
 
               <div className="flex items-center gap-2 md:justify-end">
-  <StatusDot status={toDotStatus(row.status)} />
-  <span className="kado-mono text-xs text-[var(--kado-muted)]">
-    {row.status.toUpperCase()}
-  </span>
+                <StatusDot status={toDotStatus(row.status)} />
 
-  {row.item_kind === "payment" || row.item_kind === "form" ? (
-    <form action={confirmStudentTaskStatusAction}>
-      <input type="hidden" name="statusId" value={row.status_id} />
+                <span className="kado-mono text-xs text-[var(--kado-muted)]">
+                  {row.status.toUpperCase()}
+                </span>
 
-      <button
-        type="submit"
-        className="kado-transition border border-[var(--kado-border)] px-3 py-1.5 text-xs font-semibold hover:bg-zinc-50"
-      >
-        確認完成
-      </button>
-    </form>
-  ) : (
-    <span className="kado-mono text-xs text-[var(--kado-muted)]">
-      WAIT
-    </span>
-  )}
-</div>
+                {row.item_kind === "payment" || row.item_kind === "form" ? (
+                  <form action={confirmStudentTaskStatusAction}>
+                    <input type="hidden" name="statusId" value={row.status_id} />
+
+                    <button
+                      type="submit"
+                      className="kado-transition border border-[var(--kado-border)] px-3 py-1.5 text-xs font-semibold hover:bg-zinc-50"
+                    >
+                      確認完成
+                    </button>
+                  </form>
+                ) : (
+                  <span className="kado-mono text-xs text-[var(--kado-muted)]">
+                    WAIT
+                  </span>
+                )}
+              </div>
             </div>
           ))}
         </div>

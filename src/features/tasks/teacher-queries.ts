@@ -52,6 +52,33 @@ export type TeacherDashboardData = {
   rows: TeacherDashboardRow[];
 };
 
+function getTaipeiDateKey(dateString: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(dateString));
+
+  const year = parts.find((part) => part.type === "year")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayTaipeiDateKey() {
+  return getTaipeiDateKey(new Date().toISOString());
+}
+
+function filterTodayRows(rows: TeacherDashboardRow[]) {
+  const todayKey = getTodayTaipeiDateKey();
+
+  return rows.filter(
+    (row) => getTaipeiDateKey(row.item_created_at) === todayKey
+  );
+}
+
 function buildStudentSummaries(
   rows: TeacherDashboardRow[]
 ): TeacherStudentSummary[] {
@@ -90,6 +117,7 @@ function buildStudentSummaries(
 
   return Array.from(studentMap.values());
 }
+
 function buildPublishedTaskSummaries(
   rows: TeacherDashboardRow[]
 ): PublishedTaskSummary[] {
@@ -162,13 +190,14 @@ export async function getTeacherDashboardData(): Promise<TeacherDashboardData> {
     };
   }
 
-  const rows = data as TeacherDashboardRow[];
+  const allRows = data as TeacherDashboardRow[];
+  const todayRows = filterTodayRows(allRows);
 
   return {
     profile,
-    className: rows[0]?.class_name ?? null,
-    students: buildStudentSummaries(rows),
-    publishedTasks: buildPublishedTaskSummaries(rows),
-    rows,
+    className: allRows[0]?.class_name ?? null,
+    students: buildStudentSummaries(todayRows),
+    publishedTasks: buildPublishedTaskSummaries(allRows),
+    rows: todayRows,
   };
 }

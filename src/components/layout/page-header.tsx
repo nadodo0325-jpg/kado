@@ -17,7 +17,7 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <header
-      className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-center sm:justify-between"
+      className="flex flex-col gap-4 border-b pb-4 lg:flex-row lg:items-start lg:justify-between"
       style={{ borderColor }}
     >
       <div className="min-w-0">
@@ -33,7 +33,11 @@ export function PageHeader({
         </h1>
       </div>
 
-      {right ? <div className="shrink-0">{right}</div> : null}
+      {right ? (
+        <div className="w-full shrink-0 overflow-x-auto lg:w-auto">
+          {right}
+        </div>
+      ) : null}
     </header>
   );
 }
