@@ -276,14 +276,14 @@ function PreviewOptionButton({
     >
       <span
         className="block leading-none"
-        style={{ fontSize: compact ? "15px" : "16px" }}
+        style={{ fontSize: compact ? "17px" : "18px" }}
       >
         {icon}
       </span>
 
       <span
         className="block whitespace-nowrap leading-none"
-        style={{ fontSize: compact ? "10px" : "11px" }}
+        style={{ fontSize: compact ? "12px" : "13px" }}
       >
         {label}
       </span>
@@ -304,14 +304,14 @@ function TaskRowDark({
         <StatusDot status={status} />
         <p
           className="truncate"
-          style={{ fontSize: "13px", lineHeight: "1.4" }}
+          style={{ fontSize: "15px", lineHeight: "1.4" }}
         >
           {title}
         </p>
       </div>
       <span
         className="kado-mono shrink-0 text-[var(--student-muted)]"
-        style={{ fontSize: "10px", lineHeight: "1.2" }}
+        style={{ fontSize: "12px", lineHeight: "1.2" }}
       >
         {status === "green" ? "DONE" : "完成"}
       </span>
