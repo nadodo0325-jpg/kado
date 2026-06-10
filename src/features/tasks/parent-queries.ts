@@ -102,6 +102,18 @@ function buildSummaries(groups: DashboardTaskGroup[]): CategorySummary[] {
   });
 }
 
+function getGroupStatus(items: DashboardTaskItem[]): TaskStatus {
+  if (items.some((item) => item.status === "red")) {
+    return "red";
+  }
+
+  if (items.some((item) => item.status === "processing")) {
+    return "processing";
+  }
+
+  return "green";
+}
+
 function buildGroups(rows: ParentDashboardRow[]): DashboardTaskGroup[] {
   const groupMap = new Map<string, DashboardTaskGroup>();
 
@@ -121,7 +133,7 @@ function buildGroups(rows: ParentDashboardRow[]): DashboardTaskGroup[] {
         taskId: row.task_id,
         category: row.category,
         title: row.task_title,
-        status: item.status === "green" ? "green" : "red",
+        status: item.status,
         items: [item],
       });
 
@@ -129,11 +141,7 @@ function buildGroups(rows: ParentDashboardRow[]): DashboardTaskGroup[] {
     }
 
     existingGroup.items.push(item);
-    existingGroup.status = existingGroup.items.every(
-      (groupItem) => groupItem.status === "green"
-    )
-      ? "green"
-      : "red";
+    existingGroup.status = getGroupStatus(existingGroup.items);
   });
 
   return Array.from(groupMap.values());

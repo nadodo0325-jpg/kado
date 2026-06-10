@@ -6,18 +6,21 @@ import { redirectIfAuthenticated } from "@/features/auth/queries";
 const roleOptions = [
   {
     key: "student",
-    label: "學生",
-    description: "查看今日任務、切換狀態、自主亮燈",
+    label: "學生看板",
+    description: "看今日任務、更新心情氣象與目前狀態，完成後自主亮燈。",
+    badge: "今日任務",
   },
   {
     key: "parent",
-    label: "家長",
-    description: "安靜查看孩子狀態，不用追問進度",
+    label: "家長看板",
+    description: "安靜查看孩子今天的狀態、任務進度與需要收到了解的事項。",
+    badge: "孩子狀態",
   },
   {
     key: "teacher",
-    label: "教師",
-    description: "快速發布任務、查看班級紅綠燈",
+    label: "教師工作台",
+    description: "發布今日任務、查看班級紅綠燈、追蹤未完成學生名單。",
+    badge: "班級同步",
   },
 ];
 
@@ -48,20 +51,35 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <AuthPageShell
       eyebrow="KADO"
-      title="登入你的安靜同步看板。"
-      description="這裡不做訊息轟炸，也不逼迫孩子被監控。Kado 只把每天真正需要知道的狀態，壓縮成清楚的顏色與符號。"
+      title="登入今日自律同步看板。"
+      description="Kado 把學生、家長、教師每天需要同步的任務、狀態與提醒，整理成清楚的今日看板。不用訊息轟炸，也不用反覆追問進度。"
       cardEyebrow="LOGIN"
       cardTitle="帳號登入"
-      footerNote="目前已接上 Supabase Auth 登入。"
+      footerNote="登入後會依照你的角色，自動進入學生、家長或教師工作台。"
       sideContent={
         <div className="grid gap-2">
+          <div className="border border-[var(--kado-border)] bg-zinc-950 px-4 py-3 text-white">
+            <p className="kado-mono text-xs tracking-[0.2em] text-zinc-400">
+              TODAY BOARD
+            </p>
+            <p className="mt-2 text-sm font-semibold">
+              今日任務、孩子狀態、班級進度，一次同步。
+            </p>
+          </div>
+
           {roleOptions.map((role) => (
             <div
               key={role.key}
               className="border border-[var(--kado-border)] bg-white px-4 py-3"
             >
-              <p className="text-sm font-semibold">{role.label}</p>
-              <p className="mt-1 text-xs leading-5 text-[var(--kado-muted)]">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">{role.label}</p>
+                <span className="kado-mono shrink-0 border border-[var(--kado-border)] px-2 py-1 text-[10px] text-[var(--kado-muted)]">
+                  {role.badge}
+                </span>
+              </div>
+
+              <p className="mt-2 text-xs leading-5 text-[var(--kado-muted)]">
                 {role.description}
               </p>
             </div>
@@ -71,16 +89,16 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     >
       <form action={loginAction}>
         {registered ? (
-  <div className="mb-4 border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-700">
-    註冊成功，請使用剛剛建立的帳號登入。
-  </div>
-) : null}
+          <div className="mb-4 border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-700">
+            註冊成功，請使用剛剛建立的帳號登入。
+          </div>
+        ) : null}
 
-{loggedOut ? (
-  <div className="mb-4 border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-700">
-    已登出。
-  </div>
-) : null}
+        {loggedOut ? (
+          <div className="mb-4 border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-700">
+            已登出。
+          </div>
+        ) : null}
 
         {error ? (
           <div className="mb-4 border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-600">
@@ -110,7 +128,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           type="submit"
           className="kado-transition mt-5 w-full bg-zinc-950 px-4 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
         >
-          登入
+          進入今日看板
         </button>
 
         <div className="mt-4 flex items-center justify-between text-xs">
@@ -121,10 +139,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             還沒有帳號？
           </a>
 
-          <a
-            href="/"
-            className="text-[var(--kado-muted)] hover:text-zinc-950"
-          >
+          <a href="/" className="text-[var(--kado-muted)] hover:text-zinc-950">
             返回首頁
           </a>
         </div>
