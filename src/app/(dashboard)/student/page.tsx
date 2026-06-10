@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { StudentCategoryBoard } from "@/components/student/student-category-board";
 import { MoodCheckinPanel } from "@/components/student/mood-checkin-panel";
 import { StudentStatusPanel } from "@/components/student/student-status-panel";
+import { StudentLiveSummary } from "@/components/student/student-live-summary";
 import { getStudentDashboardData } from "@/features/tasks/queries";
 import {
   getStudentRecentInteractions,
@@ -11,6 +12,7 @@ import {
 import { getTodayMoodCheckin } from "@/features/status/queries";
 import { TASK_CATEGORIES, type TaskCategory } from "@/lib/constants/categories";
 import { MOOD_STATUS } from "@/lib/constants/status";
+import type { MoodStatus } from "@/lib/constants/status";
 
 type StudentPageProps = {
   searchParams?: Promise<{
@@ -18,6 +20,10 @@ type StudentPageProps = {
     mood?: string;
     student_status?: string;
   }>;
+};
+
+type DisplayInteraction = StudentInteraction & {
+  created_at?: string | null;
 };
 
 function isTaskCategory(value: string | undefined): value is TaskCategory {
@@ -46,6 +52,38 @@ function formatStudentSystemTime() {
   return `${year} 年 ${month} 月 ${day} 日 ${weekday} ${hour}:${minute}`;
 }
 
+function getTaipeiDateKey(dateString: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(dateString));
+
+  const year = parts.find((part) => part.type === "year")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayTaipeiDateKey() {
+  return getTaipeiDateKey(new Date().toISOString());
+}
+
+function formatTaipeiTime(dateString?: string | null) {
+  if (!dateString) {
+    return "今日";
+  }
+
+  return new Intl.DateTimeFormat("zh-TW", {
+    timeZone: "Asia/Taipei",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(dateString));
+}
+
 export default async function StudentPage({ searchParams }: StudentPageProps) {
   const params = await searchParams;
   const selectedCategory = isTaskCategory(params?.category)
@@ -55,8 +93,10 @@ export default async function StudentPage({ searchParams }: StudentPageProps) {
   const { profile, groups, summaries } = await getStudentDashboardData();
   const interactions = await getStudentRecentInteractions();
   const todayMood = await getTodayMoodCheckin();
-  const mood = MOOD_STATUS[profile.aura_color];
   const systemTime = formatStudentSystemTime();
+
+  const initialMood = (todayMood ?? profile.aura_color) as MoodStatus;
+  const mood = MOOD_STATUS[initialMood];
 
   return (
     <main className="student-shell">
@@ -68,14 +108,10 @@ export default async function StudentPage({ searchParams }: StudentPageProps) {
           mutedColor="var(--student-muted)"
           right={
             <div className="flex items-center gap-2">
-              <div className="border border-[var(--student-border)] px-3 py-2 text-right">
-                <p className="kado-mono text-xs text-[var(--student-muted)]">
-                  AURA
-                </p>
-                <p className="text-sm">
-                  {mood.icon} {mood.label}
-                </p>
-              </div>
+              <StudentLiveSummary
+                initialMood={initialMood}
+                initialStatus={profile.current_status}
+              />
 
               <LogoutButton tone="dark" />
             </div>
@@ -143,47 +179,89 @@ function StudentInteractionPanel({
     },
   };
 
+  const todayKey = getTodayTaipeiDateKey();
+
+  const todayInteractions = (interactions as DisplayInteraction[])
+    .filter((interaction) => {
+      if (!interaction.created_at) {
+        return true;
+      }
+
+      return getTaipeiDateKey(interaction.created_at) === todayKey;
+    })
+    .sort((a, b) => {
+      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+
+      return bTime - aTime;
+    });
+
+  const latestInteractions = todayInteractions.slice(0, 3);
+  const hiddenInteractions = todayInteractions.slice(3);
+
+  function renderInteraction(interaction: DisplayInteraction) {
+    const item =
+      labels[interaction.interaction_type as keyof typeof labels] ?? {
+        icon: "•",
+        title: "新的無聲關懷",
+        message: "家長送來了一則新的互動。",
+      };
+
+    return (
+      <div key={interaction.id} className="px-3 py-3">
+        <div className="flex items-start gap-3">
+          <span className="text-lg">{item.icon}</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">{item.title}</p>
+              <p className="kado-mono shrink-0 text-xs text-[var(--student-muted)]">
+                {formatTaipeiTime(interaction.created_at)}
+              </p>
+            </div>
+
+            <p className="mt-1 text-xs text-[var(--student-muted)]">
+              {interaction.parent_name}：{item.message}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <section className="mt-5 border border-[var(--student-border)]">
       <div className="flex items-center justify-between border-b border-[var(--student-border)] px-3 py-2">
         <h2 className="text-sm font-semibold">家長無聲關懷</h2>
         <p className="kado-mono text-xs text-[var(--student-muted)]">
-          RECENT {interactions.length}
+          TODAY {todayInteractions.length}
         </p>
       </div>
 
-      {interactions.length > 0 ? (
+      {latestInteractions.length > 0 ? (
         <div className="divide-y divide-[var(--student-border)]">
-          {interactions.map((interaction) => {
-            const item =
-              labels[interaction.interaction_type as keyof typeof labels] ?? {
-                icon: "•",
-                title: "新的無聲關懷",
-                message: "家長送來了一則新的互動。",
-              };
-
-            return (
-              <div key={interaction.id} className="px-3 py-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg">{item.icon}</span>
-                  <div>
-                    <p className="text-sm font-medium">{item.title}</p>
-                    <p className="mt-1 text-xs text-[var(--student-muted)]">
-                      {interaction.parent_name}：{item.message}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {latestInteractions.map((interaction) => renderInteraction(interaction))}
         </div>
       ) : (
         <div className="px-3 py-6">
           <p className="text-sm text-[var(--student-muted)]">
-            目前沒有新的無聲關懷。
+            今日目前沒有新的無聲關懷。
           </p>
         </div>
       )}
+
+      {hiddenInteractions.length > 0 ? (
+        <details className="border-t border-[var(--student-border)]">
+          <summary className="cursor-pointer px-3 py-2 text-xs text-[var(--student-muted)]">
+            查看較早的今日關懷 {hiddenInteractions.length} 筆
+          </summary>
+
+          <div className="divide-y divide-[var(--student-border)]">
+            {hiddenInteractions.map((interaction) =>
+              renderInteraction(interaction)
+            )}
+          </div>
+        </details>
+      ) : null}
     </section>
   );
 }

@@ -8,6 +8,12 @@ import { STUDENT_STATUS, type StudentStatus } from "@/lib/constants/status";
 
 const statusKeys: StudentStatus[] = ["moving", "home", "flow"];
 
+const statusLabels: Record<StudentStatus, string> = {
+  moving: "返家中",
+  home: "到家了",
+  flow: "開始唸書",
+};
+
 type StudentStatusPanelProps = {
   currentStatus: StudentStatus | string | null | undefined;
   selectedCategory: TaskCategory;
@@ -24,8 +30,8 @@ function getValidStatus(
 
 function getStatusButtonClass(isSelected: boolean) {
   return isSelected
-    ? "w-full border border-green-500 bg-[var(--green-soft)] px-3 py-3 text-left touch-manipulation"
-    : "w-full border border-[var(--student-border)] px-3 py-3 text-left touch-manipulation";
+    ? "w-full border border-green-500 bg-[var(--green-soft)] px-3 py-3 text-center touch-manipulation"
+    : "w-full border border-[var(--student-border)] px-3 py-3 text-center touch-manipulation";
 }
 
 export function StudentStatusPanel({
@@ -45,9 +51,7 @@ export function StudentStatusPanel({
   function setHelperText(type: "idle" | "updated" | "failed") {
     const helper = helperRef.current;
 
-    if (!helper) {
-      return;
-    }
+    if (!helper) return;
 
     if (type === "updated") {
       helper.textContent = "目前狀態已更新。";
@@ -61,7 +65,7 @@ export function StudentStatusPanel({
       return;
     }
 
-    helper.textContent = "選擇你現在的學習狀態。";
+    helper.textContent = "選擇你現在的狀態。";
     helper.className = "mt-2 min-h-4 text-xs text-[var(--student-muted)]";
   }
 
@@ -78,6 +82,12 @@ export function StudentStatusPanel({
     flushSync(() => {
       setLocalStatus(statusKey);
     });
+
+    window.dispatchEvent(
+      new CustomEvent("kado:student-status-change", {
+        detail: { status: statusKey },
+      })
+    );
 
     window.requestAnimationFrame(() => {
       window.setTimeout(() => {
@@ -102,15 +112,11 @@ export function StudentStatusPanel({
         throw new Error(response.error);
       }
 
-      if (requestIdRef.current !== requestId) {
-        return;
-      }
+      if (requestIdRef.current !== requestId) return;
 
       setHelperText("updated");
     } catch {
-      if (requestIdRef.current !== requestId) {
-        return;
-      }
+      if (requestIdRef.current !== requestId) return;
 
       flushSync(() => {
         setLocalStatus(previousStatus);
@@ -125,7 +131,7 @@ export function StudentStatusPanel({
       ? "目前狀態已更新。"
       : result === "failed"
         ? "狀態更新失敗，請稍後再試。"
-        : "選擇你現在的學習狀態。";
+        : "選擇你現在的狀態。";
 
   const initialHelperClass =
     result === "updated"
@@ -150,7 +156,7 @@ export function StudentStatusPanel({
             >
               <span className="block text-lg">{item.icon}</span>
               <span className="mt-2 block text-xs text-[var(--student-muted)]">
-                {item.label}
+                {statusLabels[statusKey]}
               </span>
             </button>
           );

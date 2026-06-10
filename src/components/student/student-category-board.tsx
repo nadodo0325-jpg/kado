@@ -14,14 +14,8 @@ import {
 import type { TaskStatus } from "@/lib/constants/status";
 
 function toDotStatus(status: TaskStatus): "red" | "green" | "yellow" {
-  if (status === "green") {
-    return "green";
-  }
-
-  if (status === "processing") {
-    return "yellow";
-  }
-
+  if (status === "green") return "green";
+  if (status === "processing") return "yellow";
   return "red";
 }
 
@@ -30,21 +24,15 @@ function getCategoryLabel(categoryKey: TaskCategory) {
 }
 
 function getTaskStatusText(status: TaskStatus) {
-  if (status === "green") {
-    return "DONE";
-  }
-
-  if (status === "processing") {
-    return "PENDING";
-  }
-
+  if (status === "green") return "DONE";
+  if (status === "processing") return "PENDING";
   return "TODO";
 }
 
 function getCategoryButtonClass(isSelected: boolean) {
   return isSelected
-    ? "border-r border-b border-[var(--student-border)] bg-[var(--student-card)] p-4 text-left touch-manipulation"
-    : "border-r border-b border-[var(--student-border)] p-4 text-left touch-manipulation";
+    ? "border-r border-b border-[var(--student-border)] bg-[var(--student-card)] px-2 py-2 text-center touch-manipulation"
+    : "border-r border-b border-[var(--student-border)] px-2 py-2 text-center touch-manipulation";
 }
 
 export function StudentCategoryBoard({
@@ -64,16 +52,13 @@ export function StudentCategoryBoard({
   }, [groups, selectedCategory]);
 
   function handleCategoryChange(category: TaskCategory) {
-    if (category === selectedCategory) {
-      return;
-    }
-
+    if (category === selectedCategory) return;
     setSelectedCategory(category);
   }
 
   return (
     <>
-      <section className="mt-5 grid grid-cols-2 border border-[var(--student-border)]">
+      <section className="mt-5 grid grid-cols-4 border border-[var(--student-border)]">
         {TASK_CATEGORIES.map((category) => {
           const summary = summaries.find(
             (item) => item.category === category.key
@@ -91,13 +76,15 @@ export function StudentCategoryBoard({
               onPointerDown={() => handleCategoryChange(category.key)}
               className={getCategoryButtonClass(isSelected)}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-xl">{category.icon}</span>
+              <div className="flex items-center justify-center gap-1">
+                <span className="text-base">{category.icon}</span>
                 <StatusDot status={toDotStatus(status)} />
               </div>
 
-              <p className="mt-5 text-sm font-semibold">{category.label}</p>
-              <p className="kado-mono mt-1 text-xs text-[var(--student-muted)]">
+              <p className="mt-2 text-[11px] font-semibold leading-tight">
+                {category.label}
+              </p>
+              <p className="kado-mono mt-1 text-[10px] text-[var(--student-muted)]">
                 {completed}/{total}
               </p>
             </button>
@@ -183,9 +170,7 @@ function LightTaskRow({
   const canComplete = localStatus === "red";
 
   function handleComplete() {
-    if (!canComplete || isPending) {
-      return;
-    }
+    if (!canComplete || isPending) return;
 
     setLocalStatus("green");
 

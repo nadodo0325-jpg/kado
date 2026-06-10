@@ -44,18 +44,16 @@ export function MoodCheckinPanel({
             : "REQUIRED";
     }
 
-    if (!helper) {
-      return;
-    }
+    if (!helper) return;
 
     if (type === "saving") {
-      helper.textContent = "正在背景儲存，不影響你繼續操作。";
+      helper.textContent = "背景儲存中，不影響操作。";
       helper.className = "mt-1 text-xs text-[var(--student-muted)]";
       return;
     }
 
     if (type === "updated") {
-      helper.textContent = "今日心情氣象已更新。";
+      helper.textContent = "心情氣象已更新。";
       helper.className = "mt-1 text-xs text-green-400";
       return;
     }
@@ -66,7 +64,7 @@ export function MoodCheckinPanel({
       return;
     }
 
-    helper.textContent = "每天第一次進入時，先選一個今天的狀態。";
+    helper.textContent = "選擇今天的狀態。";
     helper.className = "mt-1 text-xs text-[var(--student-muted)]";
   }
 
@@ -92,6 +90,13 @@ export function MoodCheckinPanel({
 
     requestIdRef.current = requestId;
     activeMoodRef.current = moodKey;
+
+    window.dispatchEvent(
+      new CustomEvent("kado:mood-change", {
+        detail: { mood: moodKey },
+      })
+    );
+
     setHelperText("saving");
 
     window.setTimeout(() => {
@@ -115,15 +120,11 @@ export function MoodCheckinPanel({
         throw new Error(response.error);
       }
 
-      if (requestIdRef.current !== requestId) {
-        return;
-      }
+      if (requestIdRef.current !== requestId) return;
 
       setHelperText("updated");
     } catch {
-      if (requestIdRef.current !== requestId) {
-        return;
-      }
+      if (requestIdRef.current !== requestId) return;
 
       rollbackMood(previousMood);
       setHelperText("failed");
@@ -132,10 +133,10 @@ export function MoodCheckinPanel({
 
   const initialHelperText =
     result === "updated"
-      ? "今日心情氣象已更新。"
+      ? "心情氣象已更新。"
       : result === "failed"
         ? "更新失敗，請稍後再試。"
-        : "每天第一次進入時，先選一個今天的狀態。";
+        : "選擇今天的狀態。";
 
   const initialHelperClass =
     result === "updated"
@@ -162,7 +163,7 @@ export function MoodCheckinPanel({
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 p-3 md:grid-cols-4">
+      <div className="grid grid-cols-4 gap-1.5 p-2">
         {moodKeys.map((moodKey) => {
           const mood = MOOD_STATUS[moodKey];
           const isSelected = currentMood === moodKey;
@@ -181,9 +182,9 @@ export function MoodCheckinPanel({
                 className="peer sr-only"
               />
 
-              <span className="block w-full border border-[var(--student-border)] px-3 py-3 text-left peer-checked:border-green-500 peer-checked:bg-[var(--green-soft)]">
-                <span className="block text-lg">{mood.icon}</span>
-                <span className="mt-2 block text-xs text-[var(--student-muted)]">
+              <span className="block w-full border border-[var(--student-border)] px-2 py-2 text-center peer-checked:border-green-500 peer-checked:bg-[var(--green-soft)]">
+                <span className="block text-base">{mood.icon}</span>
+                <span className="mt-1 block text-[11px] leading-tight text-[var(--student-muted)]">
                   {mood.label}
                 </span>
               </span>
