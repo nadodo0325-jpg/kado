@@ -21,9 +21,18 @@ const parentActions = [
   { icon: "👍", label: "表現很好" },
 ];
 
-const studentStatusItems = ["🚌 返家中", "🏠 到家了", "📖 開始唸書"];
+const studentStatusItems = [
+  { icon: "🚌", label: "返家中" },
+  { icon: "🏠", label: "到家了" },
+  { icon: "📖", label: "開始唸書" },
+];
 
-const moodItems = ["⚡ 精神好", "🌤️ 穩定", "😴 有點累", "🌧️ 低氣壓"];
+const moodItems = [
+  { icon: "⚡", label: "精神好" },
+  { icon: "🌤️", label: "穩定" },
+  { icon: "😴", label: "有點累" },
+  { icon: "🌧️", label: "低氣壓" },
+];
 
 function StatusDot({ status }: { status: PreviewStatus }) {
   const className =
@@ -118,10 +127,15 @@ export default function HomePage() {
             <div className="grid grid-cols-3 border-b border-[var(--kado-border)]">
               {studentStatusItems.map((item) => (
                 <div
-                  key={item}
-                  className="border-r border-[var(--kado-border)] px-3 py-3 text-center last:border-r-0"
+                  key={item.label}
+                  className="border-r border-[var(--kado-border)] px-2 py-3 text-center last:border-r-0"
                 >
-                  <p className="text-xs font-semibold">{item}</p>
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <span className="text-base leading-none">{item.icon}</span>
+                    <span className="text-[11px] font-semibold leading-none">
+                      {item.label}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -196,33 +210,40 @@ function StudentPreview() {
     <div className="student-shell min-h-0 border border-[var(--student-border)] p-4">
       <div className="flex items-center justify-between border-b border-[var(--student-border)] pb-3">
         <div>
-          <p className="kado-mono text-xs text-[var(--student-muted)]">
+          <p
+            className="kado-mono text-[11px] tracking-[0.16em] text-[var(--student-muted)]"
+            style={{ fontSize: "11px", lineHeight: "1.2" }}
+          >
             STUDENT BOARD
           </p>
-          <h3 className="mt-1 text-sm font-semibold">學生端：今日自律看板</h3>
+          <h3
+            className="mt-1 font-semibold"
+            style={{ fontSize: "15px", lineHeight: "1.4" }}
+          >
+            學生端：今日自律看板
+          </h3>
         </div>
-        <div className="h-8 w-8 border border-green-500" />
+        <div className="h-8 w-8 shrink-0 border border-green-500" />
       </div>
 
       <div className="mt-4 grid grid-cols-4 gap-1.5">
         {moodItems.map((item) => (
-          <button
-            key={item}
-            className="border border-[var(--student-border)] px-2 py-2 text-[10px] text-[var(--student-muted)]"
-          >
-            {item}
-          </button>
+          <PreviewOptionButton
+            key={item.label}
+            icon={item.icon}
+            label={item.label}
+            compact
+          />
         ))}
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2">
         {studentStatusItems.map((item) => (
-          <button
-            key={item}
-            className="border border-[var(--student-border)] px-2 py-2 text-xs text-[var(--student-muted)]"
-          >
-            {item}
-          </button>
+          <PreviewOptionButton
+            key={item.label}
+            icon={item.icon}
+            label={item.label}
+          />
         ))}
       </div>
 
@@ -235,6 +256,41 @@ function StudentPreview() {
   );
 }
 
+function PreviewOptionButton({
+  icon,
+  label,
+  compact = false,
+}: {
+  icon: string;
+  label: string;
+  compact?: boolean;
+}) {
+  return (
+    <button
+      className={
+        compact
+          ? "flex h-14 flex-col items-center justify-center gap-1 border border-[var(--student-border)] px-1 py-2 text-center text-[var(--student-muted)]"
+          : "flex h-14 flex-col items-center justify-center gap-1 border border-[var(--student-border)] px-2 py-2 text-center text-[var(--student-muted)]"
+      }
+      type="button"
+    >
+      <span
+        className="block leading-none"
+        style={{ fontSize: compact ? "15px" : "16px" }}
+      >
+        {icon}
+      </span>
+
+      <span
+        className="block whitespace-nowrap leading-none"
+        style={{ fontSize: compact ? "10px" : "11px" }}
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
 function TaskRowDark({
   status,
   title,
@@ -244,11 +300,19 @@ function TaskRowDark({
 }) {
   return (
     <div className="flex items-center justify-between border-b border-[var(--student-border)] px-3 py-3 last:border-b-0">
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <StatusDot status={status} />
-        <p className="text-sm">{title}</p>
+        <p
+          className="truncate"
+          style={{ fontSize: "13px", lineHeight: "1.4" }}
+        >
+          {title}
+        </p>
       </div>
-      <span className="kado-mono text-xs text-[var(--student-muted)]">
+      <span
+        className="kado-mono shrink-0 text-[var(--student-muted)]"
+        style={{ fontSize: "10px", lineHeight: "1.2" }}
+      >
         {status === "green" ? "DONE" : "完成"}
       </span>
     </div>
@@ -292,6 +356,7 @@ function ParentPreview() {
           <button
             key={action.label}
             className="border border-[var(--parent-border)] px-3 py-3 text-xs hover:bg-slate-50"
+            type="button"
           >
             <span className="block text-lg">{action.icon}</span>
             <span className="mt-1 block">{action.label}</span>
@@ -360,9 +425,7 @@ function TeacherTaskRow({
       <p className="text-sm">{title}</p>
       <div className="flex items-center gap-2">
         <span className="kado-mono text-xs text-red-500">RED {red}</span>
-        <span className="kado-mono text-xs text-green-600">
-          GREEN {green}
-        </span>
+        <span className="kado-mono text-xs text-green-600">GREEN {green}</span>
       </div>
     </div>
   );
