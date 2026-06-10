@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-export async function completeTaskItemAction(taskItemId: string) {
+async function completeTaskItem(taskItemId: string) {
   const supabase = await createClient();
 
   const {
@@ -23,7 +23,7 @@ export async function completeTaskItemAction(taskItemId: string) {
   });
 
   if (error) {
-    console.error("completeTaskItemAction error:", error);
+    console.error("completeTaskItem error:", error);
 
     return {
       ok: false,
@@ -32,7 +32,7 @@ export async function completeTaskItemAction(taskItemId: string) {
   }
 
   if (!data || data.length === 0) {
-    console.error("completeTaskItemAction no rows updated:", {
+    console.error("completeTaskItem no rows updated:", {
       userId: user.id,
       taskItemId,
     });
@@ -43,9 +43,22 @@ export async function completeTaskItemAction(taskItemId: string) {
     };
   }
 
-  revalidatePath("/student");
-
   return {
     ok: true,
   };
+}
+
+export async function completeTaskItemAction(taskItemId: string) {
+  const result = await completeTaskItem(taskItemId);
+
+  if (result.ok) {
+    revalidatePath("/student");
+    revalidatePath("/parent");
+  }
+
+  return result;
+}
+
+export async function completeTaskItemSilentAction(taskItemId: string) {
+  return completeTaskItem(taskItemId);
 }

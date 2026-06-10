@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { StatusDot } from "@/components/common/status-dot";
-import { completeTaskItemAction } from "@/features/tasks/actions";
+import { completeTaskItemSilentAction } from "@/features/tasks/actions";
 import type {
   CategorySummary,
   DashboardTaskGroup,
@@ -35,6 +35,54 @@ function getCategoryButtonClass(isSelected: boolean) {
     : "border-r border-b border-[var(--student-border)] px-2 py-2 text-center touch-manipulation";
 }
 
+function getGroupStatus(items: DashboardTaskGroup["items"]): TaskStatus {
+  if (items.some((item) => item.status === "red")) {
+    return "red";
+  }
+
+  if (items.some((item) => item.status === "processing")) {
+    return "processing";
+  }
+
+  return "green";
+}
+
+function buildCategorySummaries(
+  groups: DashboardTaskGroup[],
+  fallbackSummaries: CategorySummary[]
+): CategorySummary[] {
+  return TASK_CATEGORIES.map((category) => {
+    const items = groups
+      .filter((group) => group.category === category.key)
+      .flatMap((group) => group.items);
+
+    if (items.length === 0) {
+      const fallback = fallbackSummaries.find(
+        (summary) => summary.category === category.key
+      );
+
+      return {
+        category: category.key,
+        status: fallback?.status ?? "green",
+        completed: fallback?.completed ?? 0,
+        total: fallback?.total ?? 0,
+      };
+    }
+
+    const total = items.length;
+    const completed = items.filter((item) => item.status === "green").length;
+    const hasRed = items.some((item) => item.status === "red");
+    const hasProcessing = items.some((item) => item.status === "processing");
+
+    return {
+      category: category.key,
+      status: hasRed ? "red" : hasProcessing ? "processing" : "green",
+      completed,
+      total,
+    };
+  });
+}
+
 export function StudentCategoryBoard({
   initialCategory,
   groups,
@@ -47,20 +95,42 @@ export function StudentCategoryBoard({
   const [selectedCategory, setSelectedCategory] =
     useState<TaskCategory>(initialCategory);
 
+  const [localGroups, setLocalGroups] = useState<DashboardTaskGroup[]>(groups);
+
+  const localSummaries = useMemo(() => {
+    return buildCategorySummaries(localGroups, summaries);
+  }, [localGroups, summaries]);
+
   const selectedGroups = useMemo(() => {
-    return groups.filter((group) => group.category === selectedCategory);
-  }, [groups, selectedCategory]);
+    return localGroups.filter((group) => group.category === selectedCategory);
+  }, [localGroups, selectedCategory]);
 
   function handleCategoryChange(category: TaskCategory) {
     if (category === selectedCategory) return;
     setSelectedCategory(category);
   }
 
+  function updateLocalItemStatus(taskItemId: string, nextStatus: TaskStatus) {
+    setLocalGroups((currentGroups) =>
+      currentGroups.map((group) => {
+        const updatedItems = group.items.map((item) =>
+          item.id === taskItemId ? { ...item, status: nextStatus } : item
+        );
+
+        return {
+          ...group,
+          items: updatedItems,
+          status: getGroupStatus(updatedItems),
+        };
+      })
+    );
+  }
+
   return (
     <>
       <section className="mt-5 grid grid-cols-4 border border-[var(--student-border)]">
         {TASK_CATEGORIES.map((category) => {
-          const summary = summaries.find(
+          const summary = localSummaries.find(
             (item) => item.category === category.key
           );
 
@@ -92,7 +162,11 @@ export function StudentCategoryBoard({
         })}
       </section>
 
-      <CategoryTaskPanel category={selectedCategory} groups={selectedGroups} />
+      <CategoryTaskPanel
+        category={selectedCategory}
+        groups={selectedGroups}
+        onLocalStatusChange={updateLocalItemStatus}
+      />
     </>
   );
 }
@@ -100,9 +174,11 @@ export function StudentCategoryBoard({
 function CategoryTaskPanel({
   category,
   groups,
+  onLocalStatusChange,
 }: {
   category: TaskCategory;
   groups: DashboardTaskGroup[];
+  onLocalStatusChange: (taskItemId: string, nextStatus: TaskStatus) => void;
 }) {
   const categoryMeta = getCategoryLabel(category);
 
@@ -142,11 +218,12 @@ function CategoryTaskPanel({
           </div>
 
           {group.items.map((item) => (
-            <LightTaskRow
+            <SwipeTaskRow
               key={item.id}
               taskItemId={item.id}
               title={item.title}
               status={item.status}
+              onLocalStatusChange={onLocalStatusChange}
             />
           ))}
         </section>
@@ -155,55 +232,130 @@ function CategoryTaskPanel({
   );
 }
 
-function LightTaskRow({
+function SwipeTaskRow({
   taskItemId,
   title,
   status,
+  onLocalStatusChange,
 }: {
   taskItemId: string;
   title: string;
   status: TaskStatus;
+  onLocalStatusChange: (taskItemId: string, nextStatus: TaskStatus) => void;
 }) {
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  const startXRef = useRef<number | null>(null);
+  const [dragX, setDragX] = useState(0);
   const [localStatus, setLocalStatus] = useState<TaskStatus>(status);
   const [isPending, startTransition] = useTransition();
 
   const canComplete = localStatus === "red";
+  const maxDrag = 112;
 
-  function handleComplete() {
+  function vibrate() {
+    if ("vibrate" in window.navigator) {
+      window.navigator.vibrate(18);
+    }
+  }
+
+  function resetDrag() {
+    startXRef.current = null;
+    setDragX(0);
+  }
+
+  function completeTask() {
     if (!canComplete || isPending) return;
 
+    const previousStatus = localStatus;
+
     setLocalStatus("green");
+    onLocalStatusChange(taskItemId, "green");
+    vibrate();
 
     startTransition(async () => {
-      const result = await completeTaskItemAction(taskItemId);
+      const result = await completeTaskItemSilentAction(taskItemId);
 
       if (!result.ok) {
-        setLocalStatus(status);
+        setLocalStatus(previousStatus);
+        onLocalStatusChange(taskItemId, previousStatus);
       }
     });
   }
 
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (!canComplete || isPending) return;
+
+    startXRef.current = event.clientX;
+
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // 部分瀏覽器不支援時忽略，不影響完成任務。
+    }
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (startXRef.current === null || !canComplete || isPending) return;
+
+    const diff = Math.max(0, event.clientX - startXRef.current);
+    setDragX(Math.min(diff, maxDrag));
+  }
+
+  function handlePointerUp() {
+    if (!canComplete || isPending) {
+      resetDrag();
+      return;
+    }
+
+    const rowWidth = rowRef.current?.offsetWidth ?? 320;
+    const threshold = rowWidth * 0.3;
+
+    if (dragX >= threshold) {
+      completeTask();
+    }
+
+    resetDrag();
+  }
+
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-[var(--student-border)] px-3 py-3 last:border-b-0">
-      <div className="flex min-w-0 items-center gap-3">
-        <StatusDot status={toDotStatus(localStatus)} />
-        <p className="truncate text-sm">{title}</p>
+    <div
+      ref={rowRef}
+      className="relative overflow-hidden border-b border-[var(--student-border)] last:border-b-0"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={resetDrag}
+    >
+      <div className="absolute inset-y-0 left-0 flex items-center bg-[var(--green-soft)] px-3 text-xs text-green-400">
+        放開完成
       </div>
 
-      {canComplete ? (
-        <button
-          type="button"
-          onPointerDown={handleComplete}
-          disabled={isPending}
-          className="kado-mono shrink-0 border border-[var(--student-border)] px-3 py-1.5 text-xs text-green-400 touch-manipulation disabled:opacity-50"
-        >
-          {isPending ? "..." : "完成"}
-        </button>
-      ) : (
-        <span className="kado-mono shrink-0 text-xs text-[var(--student-muted)]">
-          {getTaskStatusText(localStatus)}
-        </span>
-      )}
+      <div
+        className="relative flex touch-pan-y items-center justify-between gap-3 bg-[var(--student-bg)] px-3 py-3 transition-transform duration-150"
+        style={{
+          transform: canComplete ? `translateX(${dragX}px)` : "translateX(0px)",
+        }}
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <StatusDot status={toDotStatus(localStatus)} />
+          <p className="truncate text-sm">{title}</p>
+        </div>
+
+        {canComplete ? (
+          <button
+            type="button"
+            onClick={completeTask}
+            disabled={isPending}
+            className="kado-mono shrink-0 border border-[var(--student-border)] px-3 py-1.5 text-xs text-green-400 touch-manipulation disabled:opacity-50"
+          >
+            {isPending ? "..." : "完成"}
+          </button>
+        ) : (
+          <span className="kado-mono shrink-0 text-xs text-[var(--student-muted)]">
+            {getTaskStatusText(localStatus)}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
