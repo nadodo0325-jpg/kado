@@ -19,6 +19,12 @@ export type TeacherClassStudent = {
   email: string | null;
 };
 
+export type TeacherClassInfo = {
+  classId: string;
+  className: string;
+  classCode: string;
+};
+
 export type PublishedTaskSummary = {
   taskId: string;
   taskTitle: string;
@@ -53,12 +59,31 @@ export type TeacherDashboardRow = {
 
 export type TeacherDashboardData = {
   profile: KadoUser;
+  classId: string | null;
   className: string | null;
+  classCode: string | null;
   classStudents: TeacherClassStudent[];
   students: TeacherStudentSummary[];
   publishedTasks: PublishedTaskSummary[];
   rows: TeacherDashboardRow[];
   allRows: TeacherDashboardRow[];
+};
+
+type TeacherClassRpcRow = {
+  id: string;
+  class_name: string;
+  class_code: string;
+  teacher_id: string;
+};
+
+type ClassStudentMembershipRow = {
+  student_id: string;
+};
+
+type UserRow = {
+  id: string;
+  display_name: string;
+  email: string | null;
 };
 
 function getTaipeiDateKey(dateString: string) {
@@ -147,6 +172,37 @@ function buildClassStudentsFromRows(
   );
 }
 
+function mergeClassStudents({
+  officialStudents,
+  rowStudents,
+}: {
+  officialStudents: TeacherClassStudent[];
+  rowStudents: TeacherClassStudent[];
+}) {
+  const studentMap = new Map<string, TeacherClassStudent>();
+
+  officialStudents.forEach((student) => {
+    studentMap.set(student.studentId, student);
+  });
+
+  rowStudents.forEach((student) => {
+    if (!studentMap.has(student.studentId)) {
+      studentMap.set(student.studentId, student);
+      return;
+    }
+
+    const existing = studentMap.get(student.studentId);
+
+    if (existing && !existing.email && student.email) {
+      existing.email = student.email;
+    }
+  });
+
+  return Array.from(studentMap.values()).sort((a, b) =>
+    a.studentName.localeCompare(b.studentName, "zh-TW")
+  );
+}
+
 function buildPublishedTaskSummaries(
   rows: TeacherDashboardRow[]
 ): PublishedTaskSummary[] {
@@ -213,31 +269,119 @@ function buildPublishedTaskSummaries(
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+async function getOrCreateTeacherClass(): Promise<TeacherClassInfo | null> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc(
+    "get_or_create_my_teacher_class",
+    {
+      p_class_name: null,
+    }
+  );
+
+  if (error || !data || data.length === 0) {
+    console.error("get_or_create_my_teacher_class error:", error);
+
+    return null;
+  }
+
+  const teacherClass = data[0] as TeacherClassRpcRow;
+
+  return {
+    classId: teacherClass.id,
+    className: teacherClass.class_name,
+    classCode: teacherClass.class_code,
+  };
+}
+
+async function getTeacherClassStudentsByClassId(
+  classId: string | null
+): Promise<TeacherClassStudent[]> {
+  if (!classId) {
+    return [];
+  }
+
+  const supabase = await createClient();
+
+  const { data: memberships, error: membershipError } = await supabase
+    .from("class_students")
+    .select("student_id")
+    .eq("class_id", classId)
+    .eq("status", "active");
+
+  if (membershipError || !memberships || memberships.length === 0) {
+    if (membershipError) {
+      console.error("getTeacherClassStudents class_students error:", membershipError);
+    }
+
+    return [];
+  }
+
+  const studentIds = Array.from(
+    new Set(
+      (memberships as ClassStudentMembershipRow[])
+        .map((membership) => membership.student_id)
+        .filter(Boolean)
+    )
+  );
+
+  if (studentIds.length === 0) {
+    return [];
+  }
+
+  const { data: users, error: usersError } = await supabase
+    .from("users")
+    .select("id, display_name, email")
+    .in("id", studentIds);
+
+  if (usersError || !users) {
+    if (usersError) {
+      console.error("getTeacherClassStudents users error:", usersError);
+    }
+
+    return [];
+  }
+
+  return (users as UserRow[])
+    .map((user) => ({
+      studentId: user.id,
+      studentName: user.display_name,
+      email: user.email,
+    }))
+    .sort((a, b) => a.studentName.localeCompare(b.studentName, "zh-TW"));
+}
+
 export async function getTeacherDashboardData(): Promise<TeacherDashboardData> {
   const profile = await requireRole("teacher");
   const supabase = await createClient();
 
+  const teacherClass = await getOrCreateTeacherClass();
+
   const { data, error } = await supabase.rpc("get_my_teacher_dashboard_rows");
 
-  if (error || !data || data.length === 0) {
-    return {
-      profile,
-      className: null,
-      classStudents: [],
-      students: [],
-      publishedTasks: [],
-      rows: [],
-      allRows: [],
-    };
+  const allRows =
+    error || !data || data.length === 0 ? [] : (data as TeacherDashboardRow[]);
+
+  if (error) {
+    console.error("get_my_teacher_dashboard_rows error:", error);
   }
 
-  const allRows = data as TeacherDashboardRow[];
   const todayRows = filterTodayRows(allRows);
-  const classStudents = buildClassStudentsFromRows(allRows);
+  const rowStudents = buildClassStudentsFromRows(allRows);
+  const officialStudents = await getTeacherClassStudentsByClassId(
+    teacherClass?.classId ?? null
+  );
+
+  const classStudents = mergeClassStudents({
+    officialStudents,
+    rowStudents,
+  });
 
   return {
     profile,
-    className: allRows[0]?.class_name ?? null,
+    classId: teacherClass?.classId ?? allRows[0]?.class_id ?? null,
+    className: teacherClass?.className ?? allRows[0]?.class_name ?? null,
+    classCode: teacherClass?.classCode ?? null,
     classStudents,
     students: buildStudentSummaries(todayRows),
     publishedTasks: buildPublishedTaskSummaries(allRows),
