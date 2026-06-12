@@ -5,20 +5,30 @@ import { redirect } from "next/navigation";
 import { requireRole } from "@/features/auth/queries";
 import { createClient } from "@/lib/supabase/server";
 
-type ClassRow = {
-  id: string;
-  class_name: string;
-  class_code: string;
-  teacher_id: string;
-};
-
 function normalizeClassCode(value: string) {
   return value.trim().toUpperCase();
 }
 
+function getJoinClassErrorCode(message: string | undefined) {
+  if (!message) return "join_failed";
+
+  if (message.includes("class_code_not_found")) {
+    return "invalid_code";
+  }
+
+  if (message.includes("student_only")) {
+    return "student_only";
+  }
+
+  if (message.includes("not_authenticated")) {
+    return "not_authenticated";
+  }
+
+  return "join_failed";
+}
+
 export async function joinClassByCodeAction(formData: FormData) {
-  const profile = await requireRole("student");
-  const supabase = await createClient();
+  await requireRole("student");
 
   const classCode = normalizeClassCode(String(formData.get("classCode") ?? ""));
 
@@ -26,39 +36,18 @@ export async function joinClassByCodeAction(formData: FormData) {
     redirect("/student?join_error=missing_code");
   }
 
-  const { data: classRow, error: classError } = await supabase
-    .from("classes")
-    .select("id, class_name, class_code, teacher_id")
-    .ilike("class_code", classCode)
-    .maybeSingle();
+  const supabase = await createClient();
 
-  if (classError) {
-    console.error("joinClassByCodeAction classes error:", classError);
-    redirect("/student?join_error=join_failed");
-  }
+  const { error } = await supabase.rpc("join_my_class_by_code", {
+    p_class_code: classCode,
+  });
 
-  if (!classRow) {
-    redirect("/student?join_error=invalid_code");
-  }
+  if (error) {
+    console.error("join_my_class_by_code error:", error);
 
-  const targetClass = classRow as ClassRow;
+    const errorCode = getJoinClassErrorCode(error.message);
 
-  const { error: insertError } = await supabase
-    .from("class_students")
-    .upsert(
-      {
-        class_id: targetClass.id,
-        student_id: profile.id,
-        status: "active",
-      },
-      {
-        onConflict: "class_id,student_id",
-      }
-    );
-
-  if (insertError) {
-    console.error("joinClassByCodeAction class_students error:", insertError);
-    redirect("/student?join_error=join_failed");
+    redirect(`/student?join_error=${errorCode}`);
   }
 
   revalidatePath("/student");
