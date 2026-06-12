@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { SectionCard } from "@/components/common/section-card";
 import { StatusDot } from "@/components/common/status-dot";
@@ -403,7 +404,7 @@ function buildCalendarDays(
   const days: CalendarDay[] = [];
   const now = new Date();
 
-  for (let index = 0; index < 30; index += 1) {
+  for (let index = 0; index < 10; index += 1) {
     const date = new Date(now);
     date.setDate(now.getDate() - index);
 
@@ -475,7 +476,7 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
   );
 
   return (
-    <main className="teacher-shell">
+    <main className="teacher-shell text-[17px]">
       <section className="mx-auto min-h-screen w-full max-w-6xl px-4 py-5">
         <PageHeader
           eyebrow="TEACHER"
@@ -485,17 +486,17 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
               <TaipeiClock />
 
               <TeacherPublishModal
-               published={published}
-               error={error}
-               classStudents={dashboardData.classStudents}
+                published={published}
+                error={error}
+                classStudents={dashboardData.classStudents}
               />
 
-              <a
+              <Link
                 href="/teacher/ai-settings"
-                className="kado-transition shrink-0 border border-[var(--kado-border)] px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
+                className="kado-transition shrink-0 border border-[var(--kado-border)] px-4 py-2 text-base font-semibold hover:bg-zinc-50"
               >
                 AI 設定
-              </a>
+              </Link>
 
               <div className="shrink-0">
                 <LogoutButton />
@@ -505,25 +506,25 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
         />
 
         {confirmed ? (
-          <div className="mt-4 border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-700">
+          <div className="mt-4 border border-green-200 bg-green-50 px-3 py-3 text-base text-green-700">
             已確認完成，該項目已轉為綠燈。
           </div>
         ) : null}
 
         {deleted ? (
-          <div className="mt-4 border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-700">
+          <div className="mt-4 border border-green-200 bg-green-50 px-3 py-3 text-base text-green-700">
             任務已刪除。
           </div>
         ) : null}
 
         {published ? (
-          <div className="mt-4 border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-700">
+          <div className="mt-4 border border-green-200 bg-green-50 px-3 py-3 text-base text-green-700">
             任務已發布到班級。
           </div>
         ) : null}
 
         {error ? (
-          <div className="mt-4 border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-600">
+          <div className="mt-4 border border-red-200 bg-red-50 px-3 py-3 text-base text-red-600">
             {error}
           </div>
         ) : null}
@@ -584,83 +585,85 @@ function TeacherTaskBoard({
 
   return (
     <section className="border border-[var(--kado-border)] bg-white">
-      <div className="border-b border-[var(--kado-border)] px-4 py-3">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div className="border-b border-[var(--kado-border)] px-4 py-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm font-semibold">
+            <p className="text-xl font-semibold">
               {isToday ? "今日四大類任務看板" : "任務日曆誌"}
             </p>
-            <p className="mt-1 text-xs text-[var(--kado-muted)]">
+            <p className="mt-1 text-base leading-7 text-[var(--kado-muted)]">
               {getTaipeiDateLabel(selectedDateKey)}
               ｜點分類查看任務細項與紅綠燈人數。
             </p>
           </div>
 
           {!isToday ? (
-            <a
+            <Link
               href={buildTeacherHref({
                 dateKey: todayKey,
                 category: selectedCategory,
               })}
-              className="kado-transition border border-[var(--kado-border)] px-3 py-2 text-center text-xs font-semibold hover:bg-zinc-50"
+              scroll={false}
+              className="kado-transition border border-[var(--kado-border)] px-3 py-2 text-center text-base font-semibold hover:bg-zinc-50"
             >
               回到今日
-            </a>
+            </Link>
           ) : null}
         </div>
       </div>
 
-      <div className="grid grid-cols-4 border-b border-[var(--kado-border)]">
+      <div className="grid grid-cols-2 border-b border-[var(--kado-border)] sm:grid-cols-4">
         {categorySummaries.map((summary) => {
           const categoryMeta = getCategoryMeta(summary.category);
           const isSelected = selectedCategory === summary.category;
 
           return (
-            <a
+            <Link
               key={summary.category}
               href={buildTeacherHref({
                 dateKey: selectedDateKey,
                 category: summary.category,
               })}
+              scroll={false}
               className={
                 isSelected
-                  ? "border-r border-[var(--kado-border)] bg-zinc-950 px-2 py-3 text-center text-white"
-                  : "border-r border-[var(--kado-border)] px-2 py-3 text-center hover:bg-zinc-50"
+                  ? "border-r border-t border-[var(--kado-border)] bg-zinc-950 px-2 py-4 text-center text-white first:border-t-0 sm:border-t-0"
+                  : "border-r border-t border-[var(--kado-border)] px-2 py-4 text-center hover:bg-zinc-50 first:border-t-0 sm:border-t-0"
               }
             >
-              <div className="flex items-center justify-center gap-1">
-                <span className="text-base">{categoryMeta?.icon}</span>
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-2xl">{categoryMeta?.icon}</span>
                 <StatusDot status={toDotStatus(summary.status)} />
               </div>
 
-              <p className="mt-2 text-[11px] font-semibold leading-tight">
+              <p className="mt-2 text-lg font-semibold leading-tight">
                 {categoryMeta?.label ?? summary.category}
               </p>
 
               <div
                 className={
                   isSelected
-                    ? "kado-mono mt-2 space-y-1 text-[10px] text-white/75"
-                    : "kado-mono mt-2 space-y-1 text-[10px] text-[var(--kado-muted)]"
+                    ? "kado-mono mt-2 space-y-1 text-sm text-white/75"
+                    : "kado-mono mt-2 space-y-1 text-sm text-[var(--kado-muted)]"
                 }
               >
                 <p>RED {summary.red} 人</p>
                 <p>GREEN {summary.green} 人</p>
                 <p>TASK {summary.taskCount}</p>
               </div>
-            </a>
+            </Link>
           );
         })}
       </div>
 
       <div className="border-b border-[var(--kado-border)] px-4 py-4">
-        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-sm font-semibold">
+            <p className="text-xl font-semibold">
               {selectedCategoryMeta?.icon}{" "}
               {selectedCategoryMeta?.label ?? selectedCategory}
             </p>
-            <p className="mt-1 text-xs text-[var(--kado-muted)]">
+            <p className="mt-1 text-base leading-7 text-[var(--kado-muted)]">
               {selectedSummary.total === 0
                 ? "這一天此分類沒有任務。"
                 : `共 ${selectedSummary.total} 位學生有此分類任務。`}
@@ -668,16 +671,16 @@ function TeacherTaskBoard({
           </div>
 
           <div className="grid grid-cols-4 gap-2 text-right">
-            <p className="kado-mono text-xs text-red-500">
+            <p className="kado-mono text-sm text-red-500">
               RED {selectedSummary.red}
             </p>
-            <p className="kado-mono text-xs text-yellow-600">
+            <p className="kado-mono text-sm text-yellow-600">
               PENDING {selectedSummary.processing}
             </p>
-            <p className="kado-mono text-xs text-green-600">
+            <p className="kado-mono text-sm text-green-600">
               GREEN {selectedSummary.green}
             </p>
-            <p className="kado-mono text-xs text-[var(--kado-muted)]">
+            <p className="kado-mono text-sm text-[var(--kado-muted)]">
               TOTAL {selectedSummary.total}
             </p>
           </div>
@@ -696,7 +699,7 @@ function TeacherTaskBoard({
           </div>
         ) : (
           <div className="mt-4 border border-[var(--kado-border)] px-3 py-6">
-            <p className="text-sm text-[var(--kado-muted)]">
+            <p className="text-base text-[var(--kado-muted)]">
               這個日期的「{selectedCategoryMeta?.label}」沒有任務。
             </p>
           </div>
@@ -722,14 +725,14 @@ function TeacherTaskCardView({
 }) {
   return (
     <article className="border border-[var(--kado-border)]">
-      <div className="flex flex-col gap-2 border-b border-[var(--kado-border)] px-3 py-3 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 border-b border-[var(--kado-border)] px-3 py-3 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <StatusDot status={toDotStatus(task.status)} />
-            <p className="text-sm font-semibold">{task.taskTitle}</p>
+            <p className="text-lg font-semibold">{task.taskTitle}</p>
           </div>
 
-          <p className="kado-mono mt-1 text-xs text-[var(--kado-muted)]">
+          <p className="kado-mono mt-1 text-sm text-[var(--kado-muted)]">
             {new Date(task.createdAt).toLocaleTimeString("zh-TW", {
               hour: "2-digit",
               minute: "2-digit",
@@ -740,14 +743,14 @@ function TeacherTaskCardView({
         </div>
 
         <div className="grid grid-cols-4 gap-2 text-right">
-          <p className="kado-mono text-xs text-red-500">RED {task.red}</p>
-          <p className="kado-mono text-xs text-yellow-600">
+          <p className="kado-mono text-sm text-red-500">RED {task.red}</p>
+          <p className="kado-mono text-sm text-yellow-600">
             PENDING {task.processing}
           </p>
-          <p className="kado-mono text-xs text-green-600">
+          <p className="kado-mono text-sm text-green-600">
             GREEN {task.green}
           </p>
-          <p className="kado-mono text-xs text-[var(--kado-muted)]">
+          <p className="kado-mono text-sm text-[var(--kado-muted)]">
             TOTAL {task.total}
           </p>
         </div>
@@ -757,22 +760,22 @@ function TeacherTaskCardView({
         {task.itemLines.map((item) => (
           <div
             key={item.itemKey}
-            className="grid gap-2 px-3 py-3 md:grid-cols-[1fr_auto_auto]"
+            className="grid gap-3 px-3 py-3 md:grid-cols-[1fr_auto_auto]"
           >
             <div className="flex min-w-0 items-center gap-2">
               <StatusDot status={toDotStatus(item.status)} />
-              <p className="min-w-0 truncate text-sm">{item.title}</p>
+              <p className="min-w-0 truncate text-base">{item.title}</p>
             </div>
 
             <div className="grid grid-cols-4 gap-2 text-right">
-              <p className="kado-mono text-xs text-red-500">RED {item.red}</p>
-              <p className="kado-mono text-xs text-yellow-600">
+              <p className="kado-mono text-sm text-red-500">RED {item.red}</p>
+              <p className="kado-mono text-sm text-yellow-600">
                 PENDING {item.processing}
               </p>
-              <p className="kado-mono text-xs text-green-600">
+              <p className="kado-mono text-sm text-green-600">
                 GREEN {item.green}
               </p>
-              <p className="kado-mono text-xs text-[var(--kado-muted)]">
+              <p className="kado-mono text-sm text-[var(--kado-muted)]">
                 TOTAL {item.total}
               </p>
             </div>
@@ -787,7 +790,7 @@ function TeacherTaskCardView({
 
               <button
                 type="submit"
-                className="kado-transition border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                className="kado-transition border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
               >
                 刪除
               </button>
@@ -810,35 +813,36 @@ function TaskCalendarLog({
     <div className="px-4 py-4">
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold">任務日曆誌</p>
-          <p className="mt-1 text-xs text-[var(--kado-muted)]">
-            保留近 30 天任務紀錄，點日期查看當天四大類任務。
+          <p className="text-xl font-semibold">任務日曆誌</p>
+          <p className="mt-1 text-base leading-7 text-[var(--kado-muted)]">
+            保留近 10 天任務紀錄，點日期查看當天四大類任務。
           </p>
         </div>
 
-        <p className="kado-mono text-xs text-[var(--kado-muted)]">30 DAYS</p>
+        <p className="kado-mono text-sm text-[var(--kado-muted)]">10 DAYS</p>
       </div>
 
       <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
         {calendarDays.map((day) => (
-          <a
+          <Link
             key={day.dateKey}
             href={buildTeacherHref({
               dateKey: day.dateKey,
               category: selectedCategory,
             })}
+            scroll={false}
             className={
               day.isSelected
-                ? "border border-zinc-950 bg-zinc-950 px-2 py-2 text-center text-white"
-                : "border border-[var(--kado-border)] px-2 py-2 text-center hover:bg-zinc-50"
+                ? "border border-zinc-950 bg-zinc-950 px-2 py-3 text-center text-white"
+                : "border border-[var(--kado-border)] px-2 py-3 text-center hover:bg-zinc-50"
             }
           >
-            <p className="text-xs font-semibold">{day.label}</p>
+            <p className="text-base font-semibold">{day.label}</p>
             <p
               className={
                 day.isSelected
-                  ? "kado-mono mt-1 text-[10px] text-white/75"
-                  : "kado-mono mt-1 text-[10px] text-[var(--kado-muted)]"
+                  ? "kado-mono mt-1 text-xs text-white/75"
+                  : "kado-mono mt-1 text-xs text-[var(--kado-muted)]"
               }
             >
               {day.taskCount > 0 ? `${day.taskCount} 任務` : "無任務"}
@@ -847,14 +851,14 @@ function TaskCalendarLog({
               <p
                 className={
                   day.isSelected
-                    ? "kado-mono mt-1 text-[9px] text-white/60"
-                    : "kado-mono mt-1 text-[9px] text-[var(--kado-muted)]"
+                    ? "kado-mono mt-1 text-xs text-white/60"
+                    : "kado-mono mt-1 text-xs text-[var(--kado-muted)]"
                 }
               >
                 TODAY
               </p>
             ) : null}
-          </a>
+          </Link>
         ))}
       </div>
     </div>
@@ -876,17 +880,17 @@ function ClassStatusPanel({
 }) {
   return (
     <SectionCard>
-      <div className="flex items-center justify-between border-b border-[var(--kado-border)] px-4 py-3">
+      <div className="flex items-center justify-between border-b border-[var(--kado-border)] px-4 py-4">
         <div>
-          <p className="text-sm font-semibold">班級狀態與學生名單</p>
-          <p className="mt-1 text-xs text-[var(--kado-muted)]">
+          <p className="text-xl font-semibold">班級狀態與學生名單</p>
+          <p className="mt-1 text-base leading-7 text-[var(--kado-muted)]">
             {classNameValue
               ? "即時統計學生紅綠燈狀態。"
               : "目前尚未建立班級或任務資料。"}
           </p>
         </div>
 
-        <p className="kado-mono text-xs text-[var(--kado-muted)]">
+        <p className="kado-mono text-sm text-[var(--kado-muted)]">
           {classNameValue ?? "NO CLASS"}
         </p>
       </div>
@@ -899,7 +903,7 @@ function ClassStatusPanel({
         </div>
       ) : (
         <div className="px-4 py-8">
-          <p className="text-sm text-[var(--kado-muted)]">
+          <p className="text-base text-[var(--kado-muted)]">
             目前沒有學生任務資料。建立班級、加入學生並發布任務後，這裡會顯示統計。
           </p>
         </div>
@@ -907,26 +911,28 @@ function ClassStatusPanel({
 
       <div className="border-t border-[var(--kado-border)] p-4">
         {showIncomplete ? (
-          <a
+          <Link
             href={buildTeacherHref({
               dateKey: selectedDateKey,
               category: selectedCategory,
             })}
-            className="kado-transition block w-full border border-[var(--kado-border)] px-4 py-3 text-center text-sm font-semibold hover:bg-zinc-50"
+            scroll={false}
+            className="kado-transition block w-full border border-[var(--kado-border)] px-4 py-3 text-center text-base font-semibold hover:bg-zinc-50"
           >
             回到全部狀態
-          </a>
+          </Link>
         ) : (
-          <a
+          <Link
             href={buildTeacherHref({
               dateKey: selectedDateKey,
               category: selectedCategory,
               filter: "incomplete",
             })}
-            className="kado-transition block w-full border border-[var(--kado-border)] px-4 py-3 text-center text-sm font-semibold hover:bg-zinc-50"
+            scroll={false}
+            className="kado-transition block w-full border border-[var(--kado-border)] px-4 py-3 text-center text-base font-semibold hover:bg-zinc-50"
           >
             篩選未完成名單
-          </a>
+          </Link>
         )}
       </div>
     </SectionCard>
@@ -937,19 +943,19 @@ function StudentStatusRow({ student }: { student: TeacherStudentSummary }) {
   return (
     <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 px-4 py-3">
       <div>
-        <p className="text-sm font-medium">{student.studentName}</p>
-        <p className="kado-mono mt-1 text-xs text-[var(--kado-muted)]">
+        <p className="text-base font-medium">{student.studentName}</p>
+        <p className="kado-mono mt-1 text-sm text-[var(--kado-muted)]">
           TOTAL {student.total}
         </p>
       </div>
 
-      <p className="kado-mono text-xs text-red-500">RED {student.red}</p>
+      <p className="kado-mono text-sm text-red-500">RED {student.red}</p>
 
-      <p className="kado-mono text-xs text-green-600">
+      <p className="kado-mono text-sm text-green-600">
         GREEN {student.green}
       </p>
 
-      <p className="kado-mono text-xs text-yellow-600">
+      <p className="kado-mono text-sm text-yellow-600">
         PENDING {student.processing}
       </p>
     </div>
@@ -959,15 +965,15 @@ function StudentStatusRow({ student }: { student: TeacherStudentSummary }) {
 function IncompleteList({ rows }: { rows: TeacherDashboardRow[] }) {
   return (
     <section className="mt-5 border border-[var(--kado-border)] bg-white">
-      <div className="flex items-center justify-between border-b border-[var(--kado-border)] px-4 py-3">
+      <div className="flex items-center justify-between border-b border-[var(--kado-border)] px-4 py-4">
         <div>
-          <p className="text-sm font-semibold">未完成名單</p>
-          <p className="mt-1 text-xs text-[var(--kado-muted)]">
+          <p className="text-xl font-semibold">未完成名單</p>
+          <p className="mt-1 text-base leading-7 text-[var(--kado-muted)]">
             顯示目前仍是紅燈或黃燈的任務細項。
           </p>
         </div>
 
-        <p className="kado-mono text-xs text-red-500">COUNT {rows.length}</p>
+        <p className="kado-mono text-sm text-red-500">COUNT {rows.length}</p>
       </div>
 
       {rows.length > 0 ? (
@@ -975,18 +981,18 @@ function IncompleteList({ rows }: { rows: TeacherDashboardRow[] }) {
           {rows.map((row) => (
             <div
               key={row.status_id}
-              className="grid gap-2 px-4 py-3 md:grid-cols-[1fr_1fr_auto]"
+              className="grid gap-3 px-4 py-3 md:grid-cols-[1fr_1fr_auto]"
             >
               <div>
-                <p className="text-sm font-medium">{row.student_name}</p>
-                <p className="kado-mono mt-1 text-xs text-[var(--kado-muted)]">
+                <p className="text-base font-medium">{row.student_name}</p>
+                <p className="kado-mono mt-1 text-sm text-[var(--kado-muted)]">
                   {row.category.toUpperCase()}
                 </p>
               </div>
 
               <div>
-                <p className="text-sm">{row.item_title}</p>
-                <p className="mt-1 text-xs text-[var(--kado-muted)]">
+                <p className="text-base">{row.item_title}</p>
+                <p className="mt-1 text-sm text-[var(--kado-muted)]">
                   {row.task_title}
                 </p>
               </div>
@@ -994,7 +1000,7 @@ function IncompleteList({ rows }: { rows: TeacherDashboardRow[] }) {
               <div className="flex items-center gap-2 md:justify-end">
                 <StatusDot status={toDotStatus(row.status)} />
 
-                <span className="kado-mono text-xs text-[var(--kado-muted)]">
+                <span className="kado-mono text-sm text-[var(--kado-muted)]">
                   {row.status.toUpperCase()}
                 </span>
 
@@ -1004,13 +1010,13 @@ function IncompleteList({ rows }: { rows: TeacherDashboardRow[] }) {
 
                     <button
                       type="submit"
-                      className="kado-transition border border-[var(--kado-border)] px-3 py-1.5 text-xs font-semibold hover:bg-zinc-50"
+                      className="kado-transition border border-[var(--kado-border)] px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
                     >
                       確認完成
                     </button>
                   </form>
                 ) : (
-                  <span className="kado-mono text-xs text-[var(--kado-muted)]">
+                  <span className="kado-mono text-sm text-[var(--kado-muted)]">
                     WAIT
                   </span>
                 )}
@@ -1020,7 +1026,7 @@ function IncompleteList({ rows }: { rows: TeacherDashboardRow[] }) {
         </div>
       ) : (
         <div className="px-4 py-8">
-          <p className="text-sm text-[var(--kado-muted)]">
+          <p className="text-base text-[var(--kado-muted)]">
             目前沒有未完成項目，全班都是綠燈。
           </p>
         </div>
