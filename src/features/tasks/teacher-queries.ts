@@ -13,12 +13,19 @@ export type TeacherStudentSummary = {
   total: number;
 };
 
+export type TeacherClassStudent = {
+  studentId: string;
+  studentName: string;
+  email: string | null;
+};
+
 export type PublishedTaskSummary = {
   taskId: string;
   taskTitle: string;
   category: TaskCategory;
   itemKind: "normal" | "payment" | "form";
   itemCount: number;
+  itemTitles: string[];
   red: number;
   green: number;
   processing: number;
@@ -47,9 +54,11 @@ export type TeacherDashboardRow = {
 export type TeacherDashboardData = {
   profile: KadoUser;
   className: string | null;
+  classStudents: TeacherClassStudent[];
   students: TeacherStudentSummary[];
   publishedTasks: PublishedTaskSummary[];
   rows: TeacherDashboardRow[];
+  allRows: TeacherDashboardRow[];
 };
 
 function getTaipeiDateKey(dateString: string) {
@@ -118,18 +127,44 @@ function buildStudentSummaries(
   return Array.from(studentMap.values());
 }
 
+function buildClassStudentsFromRows(
+  rows: TeacherDashboardRow[]
+): TeacherClassStudent[] {
+  const studentMap = new Map<string, TeacherClassStudent>();
+
+  rows.forEach((row) => {
+    if (!studentMap.has(row.student_id)) {
+      studentMap.set(row.student_id, {
+        studentId: row.student_id,
+        studentName: row.student_name,
+        email: null,
+      });
+    }
+  });
+
+  return Array.from(studentMap.values()).sort((a, b) =>
+    a.studentName.localeCompare(b.studentName, "zh-TW")
+  );
+}
+
 function buildPublishedTaskSummaries(
   rows: TeacherDashboardRow[]
 ): PublishedTaskSummary[] {
   const taskMap = new Map<
     string,
-    PublishedTaskSummary & { itemIds: Set<string> }
+    PublishedTaskSummary & {
+      itemIds: Set<string>;
+      itemTitleMap: Map<string, string>;
+    }
   >();
 
   rows.forEach((row) => {
     const existing = taskMap.get(row.task_id);
 
     if (!existing) {
+      const itemTitleMap = new Map<string, string>();
+      itemTitleMap.set(row.task_item_id, row.item_title);
+
       taskMap.set(row.task_id, {
         taskId: row.task_id,
         taskTitle: row.task_title,
@@ -137,6 +172,8 @@ function buildPublishedTaskSummaries(
         itemKind: row.item_kind,
         itemCount: 1,
         itemIds: new Set([row.task_item_id]),
+        itemTitleMap,
+        itemTitles: [row.item_title],
         red: row.status === "red" ? 1 : 0,
         green: row.status === "green" ? 1 : 0,
         processing: row.status === "processing" ? 1 : 0,
@@ -148,7 +185,9 @@ function buildPublishedTaskSummaries(
     }
 
     existing.itemIds.add(row.task_item_id);
+    existing.itemTitleMap.set(row.task_item_id, row.item_title);
     existing.itemCount = existing.itemIds.size;
+    existing.itemTitles = Array.from(existing.itemTitleMap.values());
 
     if (row.status === "red") {
       existing.red += 1;
@@ -170,7 +209,7 @@ function buildPublishedTaskSummaries(
   });
 
   return Array.from(taskMap.values())
-    .map(({ itemIds, ...task }) => task)
+    .map(({ itemIds, itemTitleMap, ...task }) => task)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
@@ -184,20 +223,25 @@ export async function getTeacherDashboardData(): Promise<TeacherDashboardData> {
     return {
       profile,
       className: null,
+      classStudents: [],
       students: [],
       publishedTasks: [],
       rows: [],
+      allRows: [],
     };
   }
 
   const allRows = data as TeacherDashboardRow[];
   const todayRows = filterTodayRows(allRows);
+  const classStudents = buildClassStudentsFromRows(allRows);
 
   return {
     profile,
     className: allRows[0]?.class_name ?? null,
+    classStudents,
     students: buildStudentSummaries(todayRows),
     publishedTasks: buildPublishedTaskSummaries(allRows),
     rows: todayRows,
+    allRows,
   };
 }
