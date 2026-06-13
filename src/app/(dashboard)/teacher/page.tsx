@@ -653,29 +653,31 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
           eyebrow="TEACHER"
           title={`${profile.display_name} 的教師工作台`}
           right={
-            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end">
-             <div className="col-span-2 sm:col-span-1">
-               <TaipeiClock />
-             </div>
+  <div className="grid w-full grid-cols-3 gap-2">
+    <div className="col-span-3 flex min-h-[96px] items-center justify-center border border-[var(--kado-border)] px-3 py-4 text-center [&_*]:text-center [&_*]:text-2xl [&_*]:font-semibold sm:[&_*]:text-3xl">
+      <TaipeiClock />
+    </div>
 
-             <TeacherPublishModal
-              published={published}
-              error={error}
-              classStudents={classStudents}
-             />
+    <div className="[&>button]:h-full [&>button]:w-full [&>button]:px-2 [&>button]:py-3 [&>button]:text-center [&>button]:text-base sm:[&>button]:text-lg">
+      <TeacherPublishModal
+        published={published}
+        error={error}
+        classStudents={classStudents}
+      />
+    </div>
 
-              <Link
-             href="/teacher/ai-settings"
-             className="kado-transition shrink-0 border border-[var(--kado-border)] px-4 py-2 text-base font-semibold hover:bg-zinc-50"
-             >
-             AI 設定
-            </Link>
+    <Link
+      href="/teacher/ai-settings"
+      className="kado-transition flex h-full items-center justify-center border border-[var(--kado-border)] px-2 py-3 text-center text-base font-semibold hover:bg-zinc-50 sm:text-lg"
+    >
+      AI 設定
+    </Link>
 
-            <div className="shrink-0">
-            <LogoutButton />
-             </div>
-           </div>
-          }
+    <div className="h-full [&>form]:h-full [&_button]:h-full [&_button]:w-full [&_button]:px-2 [&_button]:py-3 [&_button]:text-base sm:[&_button]:text-lg">
+      <LogoutButton />
+    </div>
+  </div>
+}
         />
 
         {confirmed ? (
