@@ -76,13 +76,9 @@ type TeacherClassRpcRow = {
   teacher_id: string;
 };
 
-type ClassStudentMembershipRow = {
+type TeacherClassStudentRpcRow = {
   student_id: string;
-};
-
-type UserRow = {
-  id: string;
-  display_name: string;
+  student_name: string;
   email: string | null;
 };
 
@@ -281,7 +277,6 @@ async function getOrCreateTeacherClass(): Promise<TeacherClassInfo | null> {
 
   if (error || !data || data.length === 0) {
     console.error("get_or_create_my_teacher_class error:", error);
-
     return null;
   }
 
@@ -294,59 +289,24 @@ async function getOrCreateTeacherClass(): Promise<TeacherClassInfo | null> {
   };
 }
 
-async function getTeacherClassStudentsByClassId(
-  classId: string | null
-): Promise<TeacherClassStudent[]> {
-  if (!classId) {
-    return [];
-  }
-
+async function getTeacherClassStudentsByRpc(): Promise<TeacherClassStudent[]> {
   const supabase = await createClient();
 
-  const { data: memberships, error: membershipError } = await supabase
-    .from("class_students")
-    .select("student_id")
-    .eq("class_id", classId)
-    .eq("status", "active");
+  const { data, error } = await supabase.rpc("get_my_teacher_class_students");
 
-  if (membershipError || !memberships || memberships.length === 0) {
-    if (membershipError) {
-      console.error("getTeacherClassStudents class_students error:", membershipError);
+  if (error || !data) {
+    if (error) {
+      console.error("get_my_teacher_class_students error:", error);
     }
 
     return [];
   }
 
-  const studentIds = Array.from(
-    new Set(
-      (memberships as ClassStudentMembershipRow[])
-        .map((membership) => membership.student_id)
-        .filter(Boolean)
-    )
-  );
-
-  if (studentIds.length === 0) {
-    return [];
-  }
-
-  const { data: users, error: usersError } = await supabase
-    .from("users")
-    .select("id, display_name, email")
-    .in("id", studentIds);
-
-  if (usersError || !users) {
-    if (usersError) {
-      console.error("getTeacherClassStudents users error:", usersError);
-    }
-
-    return [];
-  }
-
-  return (users as UserRow[])
-    .map((user) => ({
-      studentId: user.id,
-      studentName: user.display_name,
-      email: user.email,
+  return (data as TeacherClassStudentRpcRow[])
+    .map((student) => ({
+      studentId: student.student_id,
+      studentName: student.student_name,
+      email: student.email,
     }))
     .sort((a, b) => a.studentName.localeCompare(b.studentName, "zh-TW"));
 }
@@ -368,9 +328,7 @@ export async function getTeacherDashboardData(): Promise<TeacherDashboardData> {
 
   const todayRows = filterTodayRows(allRows);
   const rowStudents = buildClassStudentsFromRows(allRows);
-  const officialStudents = await getTeacherClassStudentsByClassId(
-    teacherClass?.classId ?? null
-  );
+  const officialStudents = await getTeacherClassStudentsByRpc();
 
   const classStudents = mergeClassStudents({
     officialStudents,
