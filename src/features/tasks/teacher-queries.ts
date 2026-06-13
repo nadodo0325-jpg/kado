@@ -55,6 +55,8 @@ export type TeacherDashboardRow = {
   due_at: string | null;
   item_kind: "normal" | "payment" | "form";
   item_created_at: string;
+  apply_start_date: string | null;
+  apply_end_date: string | null;
 };
 
 export type TeacherDashboardData = {
@@ -101,12 +103,25 @@ function getTodayTaipeiDateKey() {
   return getTaipeiDateKey(new Date().toISOString());
 }
 
+function getRowApplyStartDateKey(row: TeacherDashboardRow) {
+  return row.apply_start_date ?? getTaipeiDateKey(row.item_created_at);
+}
+
+function getRowApplyEndDateKey(row: TeacherDashboardRow) {
+  return row.apply_end_date ?? getRowApplyStartDateKey(row);
+}
+
+function isDateInRowApplyRange(row: TeacherDashboardRow, dateKey: string) {
+  const startDateKey = getRowApplyStartDateKey(row);
+  const endDateKey = getRowApplyEndDateKey(row);
+
+  return dateKey >= startDateKey && dateKey <= endDateKey;
+}
+
 function filterTodayRows(rows: TeacherDashboardRow[]) {
   const todayKey = getTodayTaipeiDateKey();
 
-  return rows.filter(
-    (row) => getTaipeiDateKey(row.item_created_at) === todayKey
-  );
+  return rows.filter((row) => isDateInRowApplyRange(row, todayKey));
 }
 
 function buildStudentSummaries(

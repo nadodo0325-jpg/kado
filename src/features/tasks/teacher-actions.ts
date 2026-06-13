@@ -17,6 +17,17 @@ type AllowedItemKind = (typeof allowedItemKinds)[number];
 
 type PublishTargetScope = "class" | "students";
 
+type ApplyDateRange = {
+  applyStartDate: string;
+  applyEndDate: string;
+};
+
+type TeacherTaskRpcRow = {
+  task_id?: string;
+  item_count?: number;
+  student_count?: number;
+};
+
 function isAllowedItemKind(value: string): value is AllowedItemKind {
   return allowedItemKinds.includes(value as AllowedItemKind);
 }
@@ -25,8 +36,51 @@ function isSafeDateKey(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function getTaipeiDateKey(dateString: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(dateString));
+
+  const year = parts.find((part) => part.type === "year")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayTaipeiDateKey() {
+  return getTaipeiDateKey(new Date().toISOString());
+}
+
 function normalizeTargetScope(value: string): PublishTargetScope {
   return value === "students" ? "students" : "class";
+}
+
+function normalizeApplyDateRange(formData: FormData): ApplyDateRange {
+  const todayKey = getTodayTaipeiDateKey();
+
+  const rawStartDate = String(formData.get("applyStartDate") ?? "").trim();
+  const rawEndDate = String(formData.get("applyEndDate") ?? "").trim();
+
+  const applyStartDate = isSafeDateKey(rawStartDate) ? rawStartDate : todayKey;
+  const applyEndDate = isSafeDateKey(rawEndDate)
+    ? rawEndDate
+    : applyStartDate;
+
+  if (applyEndDate < applyStartDate) {
+    return {
+      applyStartDate: todayKey,
+      applyEndDate: todayKey,
+    };
+  }
+
+  return {
+    applyStartDate,
+    applyEndDate,
+  };
 }
 
 function normalizeStudentIdsJson(rawValue: FormDataEntryValue | null) {
@@ -82,6 +136,50 @@ function buildTeacherRedirectPath(
   return query ? `/teacher?${query}` : "/teacher";
 }
 
+function getCreatedTaskIds(data: unknown): string[] {
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data
+    .map((row) => {
+      const taskRow = row as TeacherTaskRpcRow;
+      return typeof taskRow.task_id === "string" ? taskRow.task_id : "";
+    })
+    .filter(Boolean);
+}
+
+async function updateCreatedTaskApplyDates({
+  supabase,
+  taskIds,
+  applyStartDate,
+  applyEndDate,
+}: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  taskIds: string[];
+  applyStartDate: string;
+  applyEndDate: string;
+}) {
+  if (taskIds.length === 0) {
+    return false;
+  }
+
+  const { error } = await supabase
+    .from("tasks")
+    .update({
+      apply_start_date: applyStartDate,
+      apply_end_date: applyEndDate,
+    })
+    .in("id", taskIds);
+
+  if (error) {
+    console.error("updateCreatedTaskApplyDates error:", error);
+    return false;
+  }
+
+  return true;
+}
+
 async function publishTaskByTarget({
   supabase,
   category,
@@ -90,6 +188,8 @@ async function publishTaskByTarget({
   itemKind,
   targetScope,
   studentIds,
+  applyStartDate,
+  applyEndDate,
 }: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   category: TaskCategory;
@@ -98,6 +198,8 @@ async function publishTaskByTarget({
   itemKind: AllowedItemKind;
   targetScope: PublishTargetScope;
   studentIds: string[];
+  applyStartDate: string;
+  applyEndDate: string;
 }) {
   if (targetScope === "students") {
     if (studentIds.length === 0) {
@@ -133,6 +235,21 @@ async function publishTaskByTarget({
       };
     }
 
+    const taskIds = getCreatedTaskIds(data);
+    const updated = await updateCreatedTaskApplyDates({
+      supabase,
+      taskIds,
+      applyStartDate,
+      applyEndDate,
+    });
+
+    if (!updated) {
+      return {
+        ok: false,
+        reason: "publish_failed",
+      };
+    }
+
     return {
       ok: true,
       reason: null,
@@ -145,6 +262,8 @@ async function publishTaskByTarget({
     p_title: title,
     p_items: items,
     p_item_kind: itemKind,
+    p_apply_start_date: applyStartDate,
+    p_apply_end_date: applyEndDate,
   });
 
   if (error || !data || data.length === 0) {
@@ -153,6 +272,8 @@ async function publishTaskByTarget({
       category,
       title,
       itemKind,
+      applyStartDate,
+      applyEndDate,
     });
 
     return {
@@ -178,6 +299,7 @@ export async function publishTeacherTaskAction(formData: FormData) {
     String(formData.get("targetScope") || "class")
   );
   const studentIds = normalizeStudentIdsJson(formData.get("studentIdsJson"));
+  const { applyStartDate, applyEndDate } = normalizeApplyDateRange(formData);
 
   if (!allowedCategories.includes(category)) {
     redirect("/teacher?error=invalid_category");
@@ -208,6 +330,8 @@ export async function publishTeacherTaskAction(formData: FormData) {
     itemKind,
     targetScope,
     studentIds,
+    applyStartDate,
+    applyEndDate,
   });
 
   if (!result.ok) {
@@ -218,7 +342,7 @@ export async function publishTeacherTaskAction(formData: FormData) {
   revalidatePath("/student");
   revalidatePath("/parent");
 
-  redirect("/teacher?published=1");
+  redirect(`/teacher?published=1&date=${applyStartDate}&category=${category}`);
 }
 
 export async function confirmStudentTaskStatusAction(formData: FormData) {
@@ -326,6 +450,7 @@ export async function publishTeacherTaskDraftsAction(formData: FormData) {
     String(formData.get("targetScope") || "class")
   );
   const studentIds = normalizeStudentIdsJson(formData.get("studentIdsJson"));
+  const { applyStartDate, applyEndDate } = normalizeApplyDateRange(formData);
 
   let parsedDrafts: unknown;
 
@@ -369,6 +494,8 @@ export async function publishTeacherTaskDraftsAction(formData: FormData) {
       itemKind: draft.itemKind,
       targetScope,
       studentIds,
+      applyStartDate,
+      applyEndDate,
     });
 
     if (!result.ok) {
@@ -380,5 +507,5 @@ export async function publishTeacherTaskDraftsAction(formData: FormData) {
   revalidatePath("/student");
   revalidatePath("/parent");
 
-  redirect("/teacher?published=1");
+  redirect(`/teacher?published=1&date=${applyStartDate}`);
 }

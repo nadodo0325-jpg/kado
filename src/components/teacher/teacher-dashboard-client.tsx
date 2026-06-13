@@ -230,8 +230,23 @@ function getMergedItemKind(
   return rows[0]?.item_kind ?? "normal";
 }
 
+function getRowApplyStartDateKey(row: TeacherDashboardRow) {
+  return row.apply_start_date ?? getTaipeiDateKey(row.item_created_at);
+}
+
+function getRowApplyEndDateKey(row: TeacherDashboardRow) {
+  return row.apply_end_date ?? getRowApplyStartDateKey(row);
+}
+
+function isDateInRowApplyRange(row: TeacherDashboardRow, dateKey: string) {
+  const startDateKey = getRowApplyStartDateKey(row);
+  const endDateKey = getRowApplyEndDateKey(row);
+
+  return dateKey >= startDateKey && dateKey <= endDateKey;
+}
+
 function filterRowsByDate(rows: TeacherDashboardRow[], dateKey: string) {
-  return rows.filter((row) => getTaipeiDateKey(row.item_created_at) === dateKey);
+  return rows.filter((row) => isDateInRowApplyRange(row, dateKey));
 }
 
 function filterRowsByCategory(
@@ -431,7 +446,8 @@ function buildTaskItemLines(rows: TeacherDashboardRow[]): TeacherTaskItemLine[] 
 
 function buildTaskCards(
   rows: TeacherDashboardRow[],
-  selectedCategory: TaskCategory
+  selectedCategory: TaskCategory,
+  selectedDateKey: string
 ): TeacherTaskCard[] {
   const taskMap = new Map<
     string,
@@ -447,7 +463,7 @@ function buildTaskCards(
   rows
     .filter((row) => row.category === selectedCategory)
     .forEach((row) => {
-      const dateKey = getTaipeiDateKey(row.item_created_at);
+      const dateKey = selectedDateKey;
       const taskKey = `${dateKey}::${row.category}`;
       const existing = taskMap.get(taskKey);
 
@@ -498,16 +514,6 @@ function buildCalendarDays(
   selectedDateKey: string
 ): CalendarDay[] {
   const todayKey = getTodayTaipeiDateKey();
-  const dateTaskMap = new Map<string, Set<string>>();
-
-  allRows.forEach((row) => {
-    const dateKey = getTaipeiDateKey(row.item_created_at);
-    const existing = dateTaskMap.get(dateKey) ?? new Set<string>();
-
-    existing.add(row.task_id);
-    dateTaskMap.set(dateKey, existing);
-  });
-
   const days: CalendarDay[] = [];
   const now = new Date();
 
@@ -521,10 +527,16 @@ function buildCalendarDays(
       continue;
     }
 
+    const taskIds = new Set(
+      allRows
+        .filter((row) => isDateInRowApplyRange(row, dateKey))
+        .map((row) => row.task_id)
+    );
+
     days.push({
       dateKey,
       label: getTaipeiShortDateLabel(dateKey),
-      taskCount: dateTaskMap.get(dateKey)?.size ?? 0,
+      taskCount: taskIds.size,
       isSelected: selectedDateKey === dateKey,
       isToday: todayKey === dateKey,
     });
@@ -750,7 +762,7 @@ function TeacherTaskBoard({
   const todayKey = getTodayTaipeiDateKey();
   const categorySummaries = buildCategorySummaries(rows);
   const selectedCategoryMeta = getCategoryMeta(selectedCategory);
-  const taskCards = buildTaskCards(rows, selectedCategory);
+  const taskCards = buildTaskCards(rows, selectedCategory, selectedDateKey);
   const calendarDays = buildCalendarDays(allRows, selectedDateKey);
   const isToday = selectedDateKey === todayKey;
 

@@ -20,6 +20,51 @@ const itemKindOptions = [
 
 type DraftItemKind = (typeof itemKindOptions)[number]["key"];
 type TargetScope = "class" | "students";
+type ApplyDateMode = "today" | "through_sunday" | "custom";
+
+function getTaipeiDateKey() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+
+  const year = parts.find((part) => part.type === "year")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+
+  return `${year}-${month}-${day}`;
+}
+
+function addDaysToDateKey(dateKey: string, dayCount: number) {
+  const [yearText = "", monthText = "", dayText = ""] = dateKey.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + dayCount);
+
+  const nextYear = date.getUTCFullYear();
+  const nextMonth = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const nextDay = String(date.getUTCDate()).padStart(2, "0");
+
+  return `${nextYear}-${nextMonth}-${nextDay}`;
+}
+
+function getSundayDateKey(dateKey: string) {
+  const [yearText = "", monthText = "", dayText = ""] = dateKey.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const weekDay = date.getUTCDay();
+  const daysUntilSunday = (7 - weekDay) % 7;
+
+  return addDaysToDateKey(dateKey, daysUntilSunday);
+}
 
 function getTaipeiMonthDay() {
   const parts = new Intl.DateTimeFormat("zh-TW", {
@@ -78,15 +123,68 @@ function getStudentIdsJson(studentIds: string[]) {
   return JSON.stringify(studentIds);
 }
 
+function getApplyDateRange({
+  mode,
+  customStartDate,
+  customEndDate,
+}: {
+  mode: ApplyDateMode;
+  customStartDate: string;
+  customEndDate: string;
+}) {
+  const todayKey = getTaipeiDateKey();
+
+  if (mode === "through_sunday") {
+    return {
+      applyStartDate: todayKey,
+      applyEndDate: getSundayDateKey(todayKey),
+    };
+  }
+
+  if (mode === "custom") {
+    return {
+      applyStartDate: customStartDate || todayKey,
+      applyEndDate: customEndDate || customStartDate || todayKey,
+    };
+  }
+
+  return {
+    applyStartDate: todayKey,
+    applyEndDate: todayKey,
+  };
+}
+
+function formatDateRangeLabel(startDate: string, endDate: string) {
+  if (startDate === endDate) {
+    return startDate;
+  }
+
+  return `${startDate} ~ ${endDate}`;
+}
+
 export function ContactBookParserPanel({
   classStudents,
 }: {
   classStudents: TeacherClassStudent[];
 }) {
+  const todayKey = getTaipeiDateKey();
+
   const [rawText, setRawText] = useState("");
   const [drafts, setDrafts] = useState<ParsedContactBookDraft[]>([]);
   const [targetScope, setTargetScope] = useState<TargetScope>("class");
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [applyDateMode, setApplyDateMode] =
+    useState<ApplyDateMode>("today");
+  const [customStartDate, setCustomStartDate] = useState(todayKey);
+  const [customEndDate, setCustomEndDate] = useState(todayKey);
+
+  const applyDateRange = useMemo(() => {
+    return getApplyDateRange({
+      mode: applyDateMode,
+      customStartDate,
+      customEndDate,
+    });
+  }, [applyDateMode, customStartDate, customEndDate]);
 
   const previewDrafts = useMemo(() => {
     return drafts.map((draft) => {
@@ -126,7 +224,10 @@ export function ContactBookParserPanel({
   }, [selectedStudentIds]);
 
   const isTargetingStudents = targetScope === "students";
+  const isApplyDateInvalid =
+    applyDateRange.applyEndDate < applyDateRange.applyStartDate;
   const isSubmitDisabled =
+    isApplyDateInvalid ||
     publishableDrafts.length === 0 ||
     (isTargetingStudents && selectedStudentIds.length === 0);
 
@@ -240,6 +341,107 @@ export function ContactBookParserPanel({
                 <p className="kado-mono shrink-0 text-xs text-[var(--kado-muted)]">
                   READY {publishableDrafts.length} / DRAFTS {drafts.length}
                 </p>
+              </div>
+
+              <div className="mt-3 border border-[var(--kado-border)] bg-white p-3">
+                <p className="text-sm font-medium">任務適用日期</p>
+
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() => setApplyDateMode("today")}
+                    className={
+                      applyDateMode === "today"
+                        ? "border border-zinc-950 bg-zinc-950 px-3 py-3 text-left text-sm font-semibold text-white"
+                        : "border border-[var(--kado-border)] px-3 py-3 text-left text-sm font-semibold hover:bg-zinc-50"
+                    }
+                  >
+                    今日
+                    <span className="mt-1 block text-xs font-normal opacity-70">
+                      只套用今天
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setApplyDateMode("through_sunday")}
+                    className={
+                      applyDateMode === "through_sunday"
+                        ? "border border-zinc-950 bg-zinc-950 px-3 py-3 text-left text-sm font-semibold text-white"
+                        : "border border-[var(--kado-border)] px-3 py-3 text-left text-sm font-semibold hover:bg-zinc-50"
+                    }
+                  >
+                    今日到本週日
+                    <span className="mt-1 block text-xs font-normal opacity-70">
+                      適合週末聯絡簿
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setApplyDateMode("custom")}
+                    className={
+                      applyDateMode === "custom"
+                        ? "border border-zinc-950 bg-zinc-950 px-3 py-3 text-left text-sm font-semibold text-white"
+                        : "border border-[var(--kado-border)] px-3 py-3 text-left text-sm font-semibold hover:bg-zinc-50"
+                    }
+                  >
+                    自訂日期
+                    <span className="mt-1 block text-xs font-normal opacity-70">
+                      自訂起訖範圍
+                    </span>
+                  </button>
+                </div>
+
+                {applyDateMode === "custom" ? (
+                  <div className="mt-3 grid gap-3 border border-[var(--kado-border)] bg-zinc-50 p-3 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="text-xs font-semibold text-[var(--kado-muted)]">
+                        開始日期
+                      </span>
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(event) =>
+                          setCustomStartDate(event.target.value)
+                        }
+                        className="mt-2 w-full border border-[var(--kado-border)] bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="text-xs font-semibold text-[var(--kado-muted)]">
+                        結束日期
+                      </span>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        onChange={(event) =>
+                          setCustomEndDate(event.target.value)
+                        }
+                        className="mt-2 w-full border border-[var(--kado-border)] bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                      />
+                    </label>
+                  </div>
+                ) : null}
+
+                <div className="mt-3 border border-[var(--kado-border)] bg-zinc-50 px-3 py-3">
+                  <p className="kado-mono text-[11px] text-[var(--kado-muted)]">
+                    APPLY DATE RANGE
+                  </p>
+                  <p className="mt-1 text-sm font-semibold">
+                    {formatDateRangeLabel(
+                      applyDateRange.applyStartDate,
+                      applyDateRange.applyEndDate
+                    )}
+                  </p>
+                </div>
+
+                {isApplyDateInvalid ? (
+                  <p className="mt-3 text-xs text-red-500">
+                    結束日期不能早於開始日期。
+                  </p>
+                ) : null}
               </div>
 
               <div className="mt-3 border border-[var(--kado-border)] bg-white p-3">
@@ -366,9 +568,13 @@ export function ContactBookParserPanel({
                 ))}
               </div>
 
-              {isTargetingStudents && selectedStudentIds.length === 0 ? (
+              {isSubmitDisabled ? (
                 <p className="mt-3 text-xs text-red-500">
-                  請至少選擇一位學生，或改為發送給全班。
+                  {isApplyDateInvalid
+                    ? "請確認任務適用日期。"
+                    : isTargetingStudents && selectedStudentIds.length === 0
+                      ? "請至少選擇一位學生，或改為發送給全班。"
+                      : "請至少保留一張可發布草稿。"}
                 </p>
               ) : null}
 
@@ -379,6 +585,16 @@ export function ContactBookParserPanel({
                   type="hidden"
                   name="studentIdsJson"
                   value={selectedStudentIdsJson}
+                />
+                <input
+                  type="hidden"
+                  name="applyStartDate"
+                  value={applyDateRange.applyStartDate}
+                />
+                <input
+                  type="hidden"
+                  name="applyEndDate"
+                  value={applyDateRange.applyEndDate}
                 />
 
                 <button
