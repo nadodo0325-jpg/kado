@@ -653,26 +653,28 @@ export default async function TeacherPage({ searchParams }: TeacherPageProps) {
           eyebrow="TEACHER"
           title={`${profile.display_name} 的教師工作台`}
           right={
-            <div className="flex flex-nowrap items-center justify-end gap-2 whitespace-nowrap">
-              <TaipeiClock />
+            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end">
+             <div className="col-span-2 sm:col-span-1">
+               <TaipeiClock />
+             </div>
 
-              <TeacherPublishModal
-                published={published}
-                error={error}
-                classStudents={classStudents}
-              />
+             <TeacherPublishModal
+              published={published}
+              error={error}
+              classStudents={classStudents}
+             />
 
               <Link
-                href="/teacher/ai-settings"
-                className="kado-transition shrink-0 border border-[var(--kado-border)] px-4 py-2 text-base font-semibold hover:bg-zinc-50"
-              >
-                AI 設定
-              </Link>
+             href="/teacher/ai-settings"
+             className="kado-transition shrink-0 border border-[var(--kado-border)] px-4 py-2 text-base font-semibold hover:bg-zinc-50"
+             >
+             AI 設定
+            </Link>
 
-              <div className="shrink-0">
-                <LogoutButton />
-              </div>
-            </div>
+            <div className="shrink-0">
+            <LogoutButton />
+             </div>
+           </div>
           }
         />
 
@@ -746,7 +748,7 @@ function TeacherClassCodePanel({
 }) {
   return (
     <section className="mt-5 border border-[var(--kado-border)] bg-white">
-      <div className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr]">
+      <div className="grid gap-4 p-4 xl:grid-cols-[1fr_1fr]">
         <div>
           <p className="text-xl font-semibold">班級代碼</p>
           <p className="mt-1 text-base leading-7 text-[var(--kado-muted)]">
@@ -790,7 +792,7 @@ function TeacherClassCodePanel({
           </div>
 
           {classStudents.length > 0 ? (
-            <div className="max-h-[210px] divide-y divide-[var(--kado-border)] overflow-y-auto">
+            <div className="max-h-[180px] divide-y divide-[var(--kado-border)] overflow-y-auto overscroll-contain">
               {classStudents.map((student) => (
                 <div
                   key={student.studentId}
@@ -971,25 +973,22 @@ function TeacherTaskCardView({
       <div className="divide-y divide-[var(--kado-border)]">
         {task.itemLines.map((item) => (
           <div
-            key={item.itemKey}
-            className="grid gap-3 px-3 py-3 md:grid-cols-[1fr_auto]"
-          >
-            <p className="min-w-0 truncate text-base">{item.title}</p>
+  key={item.itemKey}
+  className="flex items-center justify-between gap-3 px-3 py-3"
+>
+  <p className="min-w-0 flex-1 truncate text-base">{item.title}</p>
 
-            <form
-              action={deleteTeacherTaskItemAction}
-              className="md:justify-self-end"
-            >
+  <form action={deleteTeacherTaskItemAction} className="shrink-0">
               <input type="hidden" name="taskItemId" value={item.taskItemId} />
               <input type="hidden" name="dateKey" value={selectedDateKey} />
               <input type="hidden" name="category" value={selectedCategory} />
 
               <button
-                type="submit"
-                className="kado-transition border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
-              >
-                刪除
-              </button>
+  type="submit"
+  className="kado-transition border border-red-200 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+>
+  刪除
+</button>
             </form>
           </div>
         ))}
@@ -1105,15 +1104,15 @@ function ClassStatusPanel({
       </div>
 
       {students.length > 0 ? (
-        <div className="divide-y divide-[var(--kado-border)]">
-          {students.map((student) => (
-            <StudentCategoryStatusRow
-              key={`${selectedCategory}-${student.studentId}`}
-              student={student}
-            />
-          ))}
-        </div>
-      ) : (
+  <div className="max-h-[360px] divide-y divide-[var(--kado-border)] overflow-y-auto overscroll-contain">
+    {students.map((student) => (
+      <StudentCategoryStatusRow
+        key={`${selectedCategory}-${student.studentId}`}
+        student={student}
+      />
+    ))}
+  </div>
+) : (
         <div className="px-4 py-8">
           <p className="text-base text-[var(--kado-muted)]">
             目前沒有學生資料。建立班級、加入學生並發布任務後，這裡會顯示統計。
